@@ -1,0 +1,33 @@
+﻿@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Components.Web
+@using AppleShopikCRM.Client.Layout
+
+@* 👇 ЦЯ ОБГОРТКА ОБОВ'ЯЗКОВА! Вона передає стан авторизації вниз у всі сторінки *@
+<CascadingAuthenticationState>
+
+    <Router AppAssembly="@typeof(Program).Assembly">
+        <Found Context="routeData">
+            @* 👇 Використовуйте AuthorizeRouteView замість RouteView *@
+            <AuthorizeRouteView RouteData="@routeData" DefaultLayout="@typeof(MainLayout)">
+                <NotAuthorized>
+                    @if (context.User.Identity?.IsAuthenticated != true)
+                    {
+                        <AppleShopikCRM.Client.Pages.RedirectToLogin />
+                    }
+                    else
+                    {
+                        <p role="alert">У вас немає прав доступу до цієї сторінки.</p>
+                    }
+                </NotAuthorized>
+            </AuthorizeRouteView>
+            <FocusOnNavigate RouteData="@routeData" Selector="h1" />
+        </Found>
+        <NotFound>
+            <PageTitle>Not found</PageTitle>
+            <LayoutView Layout="@typeof(MainLayout)">
+                <p role="alert">Сторінку не знайдено.</p>
+            </LayoutView>
+        </NotFound>
+    </Router>
+
+</CascadingAuthenticationState>

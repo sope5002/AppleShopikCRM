@@ -1,0 +1,250 @@
+﻿@page "/reports"
+@using AppleShopikCRM.Client.Models
+@inject HttpClient Http
+
+<PageTitle>Звіти</PageTitle>
+
+<div class="container-fluid p-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="fw-bold text-dark"><i class="bi bi-graph-up-arrow me-2"></i>Історія Продажів</h2>
+            <p class="text-muted">Перегляд фінансових результатів та деталей чеків</p>
+        </div>
+
+        <div class="d-flex align-items-center gap-3">
+            @* Вибір магазину *@
+            <select class="form-select fw-bold border-primary" @bind="currentStoreId" @after="LoadHistory">
+                @foreach (var s in stores)
+                {
+                    <option value="@s.Id">📍 @s.Name</option>
+                }
+            </select>
+            <button class="btn btn-primary" @onclick="LoadHistory"><i class="bi bi-arrow-clockwise"></i></button>
+        </div>
+    </div>
+
+    @* КАРТКИ З ПІДСУМКАМИ (За останні 50 чеків) *@
+    @if (salesHistory.Any())
+    {
+        <div class="row g-3 mb-4">
+            <div class="col-md-3">
+                <div class="card border-0 shadow-sm bg-primary text-white h-100">
+                    <div class="card-body">
+                        <div class="opacity-75 small">Виручка (Каса)</div>
+                        <div class="fs-3 fw-bold">@salesHistory.Sum(x => x.FinalAmount).ToString("N0") ₴</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card border-0 shadow-sm bg-success text-white h-100">
+                    <div class="card-body">
+                        <div class="opacity-75 small">Чистий Прибуток</div>
+                        <div class="fs-3 fw-bold">@salesHistory.Sum(x => x.TotalProfit).ToString("N0") ₴</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card border-0 shadow-sm bg-info text-white h-100">
+                    <div class="card-body">
+                        <div class="opacity-75 small">Гарантії</div>
+                        <div class="fs-3 fw-bold">@salesHistory.SelectMany(x => x.Items).Sum(i => i.WarrantyPrice).ToString("N0") ₴</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card border-0 shadow-sm bg-warning text-dark h-100">
+                    <div class="card-body">
+                        <div class="opacity-75 small">Trade-In (Отримано)</div>
+                        <div class="fs-3 fw-bold">@salesHistory.Sum(x => x.TradeInDiscount).ToString("N0") ₴</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+
+    @* ТАБЛИЦЯ *@
+    <div class="card shadow-sm border-0">
+        <div class="card-body p-0">
+            @if (isLoading)
+            {
+                <div class="p-5 text-center text-muted">
+                    <div class="spinner-border mb-2"></div>
+                    <p>Завантаження звітів...</p>
+                </div>
+            }
+            else if (!salesHistory.Any())
+            {
+                <div class="p-5 text-center text-muted">
+                    <i class="bi bi-inbox display-1"></i>
+                    <p class="mt-3">Історія продажів порожня</p>
+                </div>
+            }
+            else
+            {
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="bg-light text-muted small text-uppercase">
+                        <tr>
+                            <th class="ps-4">ID</th>
+                            <th>Дата / Час</th>
+                            <th>Сума чеку</th>
+                            <th>Знижка / Trade-In</th>
+                            <th>До сплати</th>
+                            <th>Прибуток</th>
+                            <th class="text-end pe-4">Дії</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var sale in salesHistory)
+                        {
+                            <tr>
+                                <td class="ps-4 fw-bold text-muted">#@sale.Id</td>
+                                <td>
+                                    <div class="fw-bold">@sale.Date.ToShortDateString()</div>
+                                    <small class="text-muted">@sale.Date.ToShortTimeString()</small>
+                                </td>
+                                <td>@sale.TotalAmount.ToString("N0")</td>
+                                <td class="text-danger">
+                                    @if (sale.TradeInDiscount > 0)
+                                    {
+                                        <span>-@sale.TradeInDiscount.ToString("N0")</span>
+                                        <i class="bi bi-arrow-repeat ms-1" title="Trade-In"></i>
+                                    }
+                                    else
+                                    {
+                                        <span>—</span>
+                                    }
+                                </td>
+                                <td class="fw-bold fs-5">@sale.FinalAmount.ToString("N0")</td>
+                                <td>
+                                    <span class="badge bg-success bg-opacity-10 text-success px-2 py-1">
+                                        +@sale.TotalProfit.ToString("N0")
+                                    </span>
+                                </td>
+                                <td class="text-end pe-4">
+                                    <button class="btn btn-sm btn-outline-primary" @onclick="() => OpenDetails(sale)">
+                                        Деталі
+                                    </button>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+        </div>
+    </div>
+</div>
+
+@* МОДАЛКА ДЕТАЛЕЙ *@
+@if (selectedSale != null)
+{
+    <div class="modal fade show d-block" style="background: rgba(0,0,0,0.5);">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content border-0 shadow-lg">
+                <div class="modal-header bg-light">
+                    <h5 class="modal-title fw-bold">🧾 Чек #@selectedSale.Id</h5>
+                    <button class="btn-close" @onclick="() => selectedSale = null"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <div class="row mb-4">
+                        <div class="col-6">
+                            <small class="text-muted d-block">Дата продажу</small>
+                            <strong>@selectedSale.Date.ToString("f")</strong>
+                        </div>
+                        <div class="col-6 text-end">
+                            <small class="text-muted d-block">Касир / Коментар</small>
+                            <strong>@selectedSale.Comment</strong>
+                        </div>
+                    </div>
+
+                    <h6 class="text-muted small text-uppercase fw-bold mb-3 border-bottom pb-2">Товари</h6>
+                    @foreach (var item in selectedSale.Items)
+                    {
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <div>
+                                <div class="fw-bold">@item.ModelName</div>
+                                <div class="small text-muted">
+                                    @if (item.Type == "Device")
+                                    {
+                                        <i class="bi bi-phone me-1"></i>
+                                    }
+                                    else
+                                    {
+
+                                        <i class="bi bi-headphones me-1"></i>
+                                    }
+                                    @item.Type
+                                    @if (item.WarrantyPrice > 0)
+                                    {
+                                        <span class="badge bg-info text-dark ms-2">+ Гарантія @item.WarrantyPrice ₴</span>
+                                    }
+                                </div>
+                            </div>
+                            <div class="text-end">
+                                <div class="fw-bold">@item.SellingPrice.ToString("N0") ₴</div>
+                                <div class="small text-success">Прибуток: @item.Profit.ToString("N0")</div>
+                            </div>
+                        </div>
+                    }
+
+                    @if (selectedSale.TradeIns.Any())
+                    {
+                        <h6 class="text-muted small text-uppercase fw-bold mt-4 mb-3 border-bottom pb-2">Trade-In (Прийнято)</h6>
+                        @foreach (var tr in selectedSale.TradeIns)
+                        {
+                            <div class="alert alert-warning d-flex justify-content-between align-items-center mb-0">
+                                <div>
+                                    <div class="fw-bold">@tr.Model</div>
+                                    <small class="text-muted">IMEI: @tr.Imei</small>
+                                </div>
+                                <div class="fw-bold text-danger">-@tr.Price.ToString("N0") ₴</div>
+                            </div>
+                        }
+                    }
+                </div>
+                <div class="modal-footer bg-light justify-content-between">
+                    <div>
+                        <small class="text-muted me-2">Чистий прибуток:</small>
+                        <span class="fw-bold text-success fs-5">+@selectedSale.TotalProfit.ToString("N0") ₴</span>
+                    </div>
+                    <button class="btn btn-secondary" @onclick="() => selectedSale = null">Закрити</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<SaleReportDto> salesHistory = new();
+    private List<Store> stores = new();
+    private int currentStoreId = 1;
+    private bool isLoading = false;
+    private SaleReportDto? selectedSale;
+
+    protected override async Task OnInitializedAsync()
+    {
+        stores = await Http.GetFromJsonAsync<List<Store>>("api/transfers/stores") ?? new();
+        await LoadHistory();
+    }
+
+    private async Task LoadHistory()
+    {
+        isLoading = true;
+        try
+        {
+            salesHistory = await Http.GetFromJsonAsync<List<SaleReportDto>>($"api/sales/history?storeId={currentStoreId}") ?? new();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex.Message);
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void OpenDetails(SaleReportDto sale)
+    {
+        selectedSale = sale;
+    }
+}

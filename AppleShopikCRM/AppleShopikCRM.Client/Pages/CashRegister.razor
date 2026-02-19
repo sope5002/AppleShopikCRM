@@ -1,0 +1,243 @@
+﻿@page "/cash-register"
+@using AppleShopikCRM.Client.Models
+@inject HttpClient Http
+@rendermode InteractiveWebAssembly
+
+<PageTitle>Каса та Фінанси</PageTitle>
+
+<div class="container-fluid">
+    @* ШАПКА *@
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div class="d-flex align-items-center gap-3">
+            <h2 class="fw-bold m-0"><i class="bi bi-wallet2 me-2"></i>Каса</h2>
+            <select class="form-select fw-bold border-primary" style="width: 200px;" @bind="currentStoreId" @after="LoadData">
+                @foreach (var s in stores)
+                {
+                    <option value="@s.Id">📍 @s.Name</option>
+                }
+            </select>
+        </div>
+        <button class="btn btn-danger shadow-sm" @onclick="() => showWithdrawModal = true">
+            <i class="bi bi-dash-circle me-2"></i>Витрата / Інкасація
+        </button>
+    </div>
+
+    @* КАРТКИ БАЛАНСУ *@
+    <div class="row g-4 mb-5">
+        @* 1. Готівка UAH *@
+        <div class="col-md-3">
+            <div class="card shadow-sm border-0 bg-success text-white h-100">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <span>🇺🇦 Готівка UAH</span>
+                        <i class="bi bi-cash-stack fs-4"></i>
+                    </div>
+                    <h2 class="fw-bold mt-2">@storeBalance.BalanceUAH.ToString("N0") ₴</h2>
+                    <small class="opacity-75">За сьогодні: +@currentShift.IncomeUAH / -@currentShift.ExpenseUAH</small>
+                </div>
+            </div>
+        </div>
+
+        @* 2. Валюта USD *@
+        <div class="col-md-3">
+            <div class="card shadow-sm border-0 bg-dark text-white h-100">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <span>🇺🇸 Готівка USD</span>
+                        <i class="bi bi-currency-dollar fs-4"></i>
+                    </div>
+                    <h2 class="fw-bold mt-2">$@storeBalance.BalanceUSD.ToString("N0")</h2>
+                    <small class="opacity-75">За сьогодні: +@currentShift.IncomeUSD / -@currentShift.ExpenseUSD</small>
+                </div>
+            </div>
+        </div>
+
+        @* 3. Валюта EUR *@
+        <div class="col-md-3">
+            <div class="card shadow-sm border-0 bg-primary text-white h-100">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <span>🇪🇺 Готівка EUR</span>
+                        <i class="bi bi-currency-euro fs-4"></i>
+                    </div>
+                    <h2 class="fw-bold mt-2">€@storeBalance.BalanceEUR.ToString("N0")</h2>
+                    <small class="opacity-75">За сьогодні: +@currentShift.IncomeEUR / -@currentShift.ExpenseEUR</small>
+                </div>
+            </div>
+        </div>
+
+        @* 4. Термінал (Card) *@
+        <div class="col-md-3">
+            <div class="card shadow-sm border-0 bg-light text-dark h-100">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <span class="text-muted">💳 Термінал / Карта</span>
+                        <i class="bi bi-credit-card fs-4"></i>
+                    </div>
+                    <h2 class="fw-bold mt-2">@storeBalance.BalanceCard.ToString("N0") ₴</h2>
+                    <small class="text-muted">За сьогодні: +@currentShift.IncomeCard</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @* ІСТОРІЯ ТРАНЗАКЦІЙ *@
+    <div class="card shadow-sm border-0">
+        <div class="card-header bg-white fw-bold py-3">🕒 Останні операції</div>
+        <div class="table-responsive">
+            <table class="table table-hover mb-0 align-middle">
+                <thead class="table-light">
+                    <tr>
+                        <th>Час</th>
+                        <th>Тип</th>
+                        <th>Сума</th>
+                        <th>Категорія</th>
+                        <th>Коментар</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var t in history)
+                    {
+                        <tr>
+                            <td>@t.Date.ToString("HH:mm") <small class="text-muted">@t.Date.ToString("dd.MM")</small></td>
+                            <td>
+                                @if (t.Type == "Income")
+                                {
+                                    <span class="badge bg-success-subtle text-success"><i class="bi bi-arrow-down"></i> Прихід</span>
+                                }
+                                else
+                                {
+
+                                    <span class="badge bg-danger-subtle text-danger"><i class="bi bi-arrow-up"></i> Витрата</span>
+                                }
+                            </td>
+                            <td class="fw-bold">
+                                @if (t.Currency == "USD")
+                                {
+                                    <span>$@t.Amount</span>
+                                }
+                                else if (t.Currency == "EUR")
+                                {
+
+                                    <span>€@t.Amount</span>
+                                }
+                                else
+                                {
+
+                                    <span>@t.Amount грн</span>
+                                }
+                            </td>
+                            <td>
+                                @if (t.Category == "Sale")
+                                {
+                                    <span>Продаж товару</span>
+                                }
+                                else if (t.Category == "Withdrawal")
+                                {
+
+                                    <span>Інкасація / Витрата</span>
+                                }
+                            </td>
+                            <td class="text-muted small">@t.Comment</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+@* МОДАЛКА ВИТРАТИ *@
+@if (showWithdrawModal)
+{
+    <div class="modal fade show d-block" style="background: rgba(0,0,0,0.5);">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header bg-danger text-white">
+                    <h5 class="modal-title">💸 Видача грошей</h5>
+                    <button class="btn-close btn-close-white" @onclick="() => showWithdrawModal = false"></button>
+                </div>
+                <div class="modal-body">
+                    <label>Валюта</label>
+                    <select @bind="withdrawCurrency" class="form-select mb-3">
+                        <option value="UAH">Гривня (UAH)</option>
+                        <option value="USD">Долар (USD)</option>
+                        <option value="EUR">Євро (EUR)</option>
+                    </select>
+
+                    <label>Сума</label>
+                    <input type="number" @bind="withdrawAmount" class="form-control mb-3" />
+
+                    <label>Коментар (на що?)</label>
+                    <input type="text" @bind="withdrawComment" class="form-control mb-3" placeholder="Інкасація, кава, оренда..." />
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-light" @onclick="() => showWithdrawModal = false">Скасувати</button>
+                    <button class="btn btn-danger" @onclick="SubmitWithdraw">Підтвердити</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private int currentStoreId = 1;
+    private List<Store> stores = new();
+
+    // Дані
+    private Store storeBalance = new();
+    private CashShift currentShift = new();
+    private List<CashTransaction> history = new();
+
+    // Модалка
+    private bool showWithdrawModal = false;
+    private string withdrawCurrency = "UAH";
+    private decimal withdrawAmount = 0;
+    private string withdrawComment = "";
+
+    // Клас для відповіді API
+    class CashStatusResponse
+    {
+        public Store Store { get; set; }
+        public CashShift Shift { get; set; }
+        public List<CashTransaction> History { get; set; }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        stores = await Http.GetFromJsonAsync<List<Store>>("api/transfers/stores") ?? new();
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        var result = await Http.GetFromJsonAsync<CashStatusResponse>($"api/cash/status/{currentStoreId}");
+        if (result != null)
+        {
+            storeBalance = result.Store;
+            currentShift = result.Shift;
+            history = result.History;
+        }
+    }
+
+    private async Task SubmitWithdraw()
+    {
+        var transaction = new CashTransaction
+        {
+            StoreId = currentStoreId,
+            Amount = withdrawAmount,
+            Currency = withdrawCurrency,
+            Comment = withdrawComment,
+            Type = "Expense"
+        };
+
+        var res = await Http.PostAsJsonAsync("api/cash/withdraw", transaction);
+        if (res.IsSuccessStatusCode)
+        {
+            await LoadData();
+            showWithdrawModal = false;
+            withdrawAmount = 0;
+            withdrawComment = "";
+        }
+    }
+}

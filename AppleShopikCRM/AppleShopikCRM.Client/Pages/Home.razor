@@ -1,0 +1,31 @@
+﻿@page "/"
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Components.Web 
+
+@* 👇 ЦЕЙ РЯДОК - КЛЮЧ ДО УСПІХУ *@
+@rendermode @(new InteractiveWebAssemblyRenderMode(prerender: false))
+
+<PageTitle>Головна</PageTitle>
+
+<AuthorizeView>
+    <Authorized>
+        <div class="text-center mt-5">
+            <h1>👋 Привіт, @context.User.Identity?.Name!</h1>
+            <p class="lead">Ви успішно увійшли в систему CRM.</p>
+            
+            <div class="d-flex justify-content-center gap-3 mt-4">
+                <a href="sales" class="btn btn-primary btn-lg shadow">
+                    <i class="bi bi-cart3 me-2"></i>Продажі
+                </a>
+                <a href="repairs" class="btn btn-warning btn-lg shadow">
+                    <i class="bi bi-tools me-2"></i>Ремонти
+                </a>
+            </div>
+        </div>
+    </Authorized>
+    <NotAuthorized>
+        @* Тільки тепер цей редірект спрацює правильно (якщо токена дійсно немає) *@
+        <div class="alert alert-warning">Перевірка доступу...</div>
+        <AppleShopikCRM.Client.Pages.RedirectToLogin />
+    </NotAuthorized>
+</AuthorizeView>

@@ -1,0 +1,62 @@
+﻿@page "/login"
+@using AppleShopikCRM.Client.Models
+@using Blazored.LocalStorage
+@using Microsoft.AspNetCore.Components.Authorization
+@inject HttpClient Http
+@inject AuthenticationStateProvider AuthStateProvider
+@inject ILocalStorageService LocalStorage
+@inject NavigationManager Nav
+@using Microsoft.AspNetCore.Authorization
+@attribute [AllowAnonymous]
+@rendermode @(new InteractiveWebAssemblyRenderMode(prerender: false))
+
+<div class="d-flex justify-content-center align-items-center vh-100 bg-light">
+    <div class="card shadow p-4" style="width: 400px;">
+        <h3 class="text-center mb-3">Вхід в CRM</h3>
+
+        <div class="mb-3">
+            <label>Email</label>
+            <input class="form-control" @bind="loginModel.Email" />
+        </div>
+        <div class="mb-3">
+            <label>Пароль</label>
+            <input type="password" class="form-control" @bind="loginModel.Password" />
+        </div>
+
+        @if (!string.IsNullOrEmpty(error))
+        {
+            <div class="alert alert-danger">@error</div>
+        }
+
+        <button class="btn btn-primary w-100" @onclick="HandleLogin">Увійти</button>
+    </div>
+</div>
+
+@code {
+    private LoginDto loginModel = new();
+    private string error = "";
+
+    private async Task HandleLogin()
+    {
+        var result = await Http.PostAsJsonAsync("api/auth/login", loginModel);
+        if (result.IsSuccessStatusCode)
+        {
+            var response = await result.Content.ReadFromJsonAsync<LoginResponse>();
+
+            // Зберігаємо токен
+            await LocalStorage.SetItemAsync("authToken", response.Token);
+
+            // Повідомляємо систему, що ми увійшли
+            ((CustomAuthStateProvider)AuthStateProvider).MarkUserAsAuthenticated(response.Token);
+
+            Console.WriteLine("Login successful. State updated."); // Для перевірки в консолі
+            Nav.NavigateTo("/", forceLoad: true); // Або на головну "/"
+        }
+        else
+        {
+            error = "Невірний логін або пароль";
+        }
+    }
+
+    class LoginResponse { public string Token { get; set; } }
+}

@@ -1,0 +1,234 @@
+﻿@page "/accessories"
+@using AppleShopikCRM.Client.Models
+@inject HttpClient Http
+@rendermode InteractiveWebAssembly
+<PageTitle>Аксесуари</PageTitle>
+
+@* --- ВЕРХНЯ ПАНЕЛЬ (Ролі та Адмін-статистика) --- *@
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1><i class="bi bi-headphones me-2"></i>Склад Аксесуарів</h1>
+    
+    @* Тимчасовий перемикач ролей для тесту *@
+    <div class="btn-group">
+        <button class="btn @(isAdmin ? "btn-dark" : "btn-outline-dark")" @onclick="() => ToggleRole(true)">Я Адмін</button>
+        <button class="btn @(!isAdmin ? "btn-dark" : "btn-outline-dark")" @onclick="() => ToggleRole(false)">Я Менеджер</button>
+    </div>
+</div>
+
+@if (isAdmin)
+{
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card bg-primary text-white shadow-sm">
+                <div class="card-body">
+                    <h5>💰 Вкладено в товар</h5>
+                    <h3>@TotalInvested.ToString("N0") грн</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card bg-success text-white shadow-sm">
+                <div class="card-body">
+                    <h5>📈 Очікуваний дохід (при продажу всіх)</h5>
+                    <h3>@TotalExpected.ToString("N0") грн</h3>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@* --- КНОПКА ПОПОВНЕННЯ --- *@
+<div class="mb-3">
+    <button class="btn btn-lg btn-success w-100" @onclick="OpenRestockModal">
+        <i class="bi bi-box-seam-fill me-2"></i> ПОПОВНИТИ СКЛАД
+    </button>
+</div>
+
+@* --- ТАБЛИЦЯ --- *@
+@if (accessoriesList == null)
+{
+    <p><em>Завантаження...</em></p>
+}
+else
+{
+    <table class="table table-hover align-middle">
+        <thead class="table-light">
+            <tr>
+                <th>Назва товару</th>
+                <th>Ціна продажу</th>
+                @if (isAdmin)
+                {
+                    <th>Ціна закупки</th>
+                    <th>Залишок (шт.)</th>
+                    <th>Сума закупки</th>
+                }
+                else
+                {
+                    <th>Наявність</th>
+                }
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var item in accessoriesList)
+            {
+                <tr>
+                    <td class="fw-bold">@item.ModelName</td>
+                    <td class="text-success fw-bold">@item.SellingPrice.ToString("N0") грн</td>
+                    
+                    @if (isAdmin)
+                    {
+                        <td>@item.PurchasePrice.ToString("N0") грн</td>
+                        <td><span class="badge bg-dark fs-6">@item.Quantity</span></td>
+                        <td>@((item.Quantity * item.PurchasePrice).ToString("N0")) грн</td>
+                    }
+                    else
+                    {
+                        @* Менеджер бачить тільки є товар чи ні, без точних цифр *@
+                        <td>
+                            @if(item.Quantity > 0) 
+                            { <span class="badge bg-success">В наявності</span> } 
+                            else 
+                            { <span class="badge bg-danger">Закінчився</span> }
+                        </td>
+                    }
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@* --- МОДАЛЬНЕ ВІКНО ПОПОВНЕННЯ --- *@
+@if (showModal)
+{
+    <div class="modal fade show d-block" style="background: rgba(0,0,0,0.5);">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-dark text-white">
+                    <h5 class="modal-title">📦 Прихід товару</h5>
+                    <button type="button" class="btn-close btn-close-white" @onclick="CloseModal"></button>
+                </div>
+                <div class="modal-body">
+                    
+                    @* 1. Пошук товару *@
+                    <div class="mb-3">
+                        <label class="form-label">Пошук товару (Назва)</label>
+                        <input type="text" class="form-control" placeholder="Почніть вводити назву..." 
+                               @bind="searchTerm" @bind:event="oninput" />
+                        
+                        @* Випадаючий список підказок *@
+                        @if (!string.IsNullOrEmpty(searchTerm) && selectedProductId == 0)
+                        {
+                            <ul class="list-group mt-1 position-absolute w-100" style="z-index: 1000;">
+                                @foreach (var prod in products.Where(p => p.Name.Contains(searchTerm, StringComparison.OrdinalIgnoreCase)).Take(5))
+                                {
+                                    <li class="list-group-item list-group-item-action" 
+                                        style="cursor: pointer;"
+                                        @onclick="() => SelectProduct(prod)">
+                                        @prod.Name
+                                    </li>
+                                }
+                            </ul>
+                        }
+                    </div>
+
+                    @if(selectedProductId > 0)
+                    {
+                         <div class="alert alert-info">Обрано: <strong>@selectedProductName</strong></div>
+
+                         <div class="mb-3">
+                            <label class="form-label">Кількість, що приїхала</label>
+                            <input type="number" @bind="restockRequest.QuantityToAdd" class="form-control" />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Ціна закупки (за шт.)</label>
+                            <input type="number" @bind="restockRequest.NewPurchasePrice" class="form-control" />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Ціна продажу (нова)</label>
+                            <input type="number" @bind="restockRequest.NewSellingPrice" class="form-control" />
+                        </div>
+                    }
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" @onclick="CloseModal">Скасувати</button>
+                    <button class="btn btn-success" @onclick="SubmitRestock" disabled="@(selectedProductId == 0)">Зберегти</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    // Модель для відображення таблиці (DTO)
+    class AccessoryDto
+    {
+        public int Id { get; set; }
+        public int ProductId { get; set; }
+        public string ModelName { get; set; } = "";
+        public int Quantity { get; set; }
+        public decimal PurchasePrice { get; set; }
+        public decimal SellingPrice { get; set; }
+    }
+
+    // Модель для запиту на сервер
+    class RestockRequest
+    {
+        public int ProductId { get; set; }
+        public int QuantityToAdd { get; set; }
+        public decimal NewPurchasePrice { get; set; }
+        public decimal NewSellingPrice { get; set; }
+    }
+
+    private List<AccessoryDto>? accessoriesList;
+    private List<Product> products = new(); // Всі доступні товари для пошуку
+    
+    // Змінні для модалки
+    private bool showModal = false;
+    private string searchTerm = "";
+    private int selectedProductId = 0;
+    private string selectedProductName = "";
+    private RestockRequest restockRequest = new();
+
+    // Ролі
+    private bool isAdmin = true; // За замовчуванням адмін
+    private decimal TotalInvested => accessoriesList?.Sum(x => x.Quantity * x.PurchasePrice) ?? 0;
+    private decimal TotalExpected => accessoriesList?.Sum(x => x.Quantity * x.SellingPrice) ?? 0;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+        products = await Http.GetFromJsonAsync<List<Product>>("api/inventory/products") ?? new List<Product>();
+    }
+
+    private async Task LoadData()
+    {
+        accessoriesList = await Http.GetFromJsonAsync<List<AccessoryDto>>("api/accessories");
+    }
+
+    private void ToggleRole(bool adminStatus) => isAdmin = adminStatus;
+
+    private void OpenRestockModal()
+    { 
+        showModal = true; 
+        searchTerm = ""; 
+        selectedProductId = 0; 
+        restockRequest = new();
+    }
+    
+    private void CloseModal() => showModal = false;
+
+    private void SelectProduct(Product prod)
+    {
+        selectedProductId = prod.Id;
+        selectedProductName = prod.Name;
+        restockRequest.ProductId = prod.Id;
+        searchTerm = prod.Name; // Щоб у полі залишилась повна назва
+    }
+
+    private async Task SubmitRestock()
+    {
+        await Http.PostAsJsonAsync("api/accessories/restock", restockRequest);
+        await LoadData();
+        CloseModal();
+    }
+}

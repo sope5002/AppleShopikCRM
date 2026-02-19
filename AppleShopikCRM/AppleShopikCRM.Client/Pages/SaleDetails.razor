@@ -1,0 +1,185 @@
+﻿@page "/sale-details/{id:int}"
+@using AppleShopikCRM.Client.Models
+@inject HttpClient Http
+@inject IJSRuntime JsRuntime
+@inject NavigationManager NavManager
+
+@if (receiptData == null)
+{
+    <div class="d-flex justify-content-center mt-5">
+        <div class="spinner-border text-primary" role="status"></div>
+    </div>
+}
+else
+{
+    var sale = receiptData.Sale; // Скорочення для зручності
+
+    <div class="d-flex justify-content-center mt-4 mb-5 no-print-container">
+        <div class="btn-group shadow">
+            <button class="btn btn-secondary" @onclick='() => NavManager.NavigateTo("/repairs")'>
+                <i class="bi bi-arrow-left"></i> Назад
+            </button>
+            <button class="btn btn-primary fw-bold" @onclick="PrintReceipt">
+                <i class="bi bi-printer-fill"></i> ДРУКУВАТИ
+            </button>
+        </div>
+    </div>
+
+    @* 🔥 ДИНАМІЧНИЙ ЧЕК 🔥 *@
+    <div class="receipt-container shadow-sm mx-auto bg-white p-3">
+
+        @* 1. ШАПКА *@
+        <div class="text-center border-bottom pb-2 mb-2">
+            <h4 class="fw-bold mb-0"> @receiptData.StoreName</h4>
+            <div class="small">@receiptData.StoreAddress</div>
+            <div class="small">Тел: @receiptData.StorePhone</div>
+        </div>
+
+        @* 2. ІНФО *@
+        <div class="small mb-2">
+            <div class="d-flex justify-content-between">
+                <span>Чек №:</span> <span class="fw-bold">@sale.Id</span>
+            </div>
+            <div class="d-flex justify-content-between">
+                <span>Дата:</span> <span>@sale.SaleDate.ToString("dd.MM.yyyy HH:mm")</span>
+            </div>
+            <div class="d-flex justify-content-between">
+                <span>Касир:</span> <span class="fw-bold">@receiptData.SellerName</span>
+            </div>
+        </div>
+
+        @* 3. ТОВАРИ (Без змін) *@
+        <table class="table table-borderless table-sm small mb-2 receipt-table">
+            <thead>
+                <tr class="border-bottom border-dark">
+                    <th class="ps-0">Назва</th>
+                    <th class="text-center">К-сть</th>
+                    <th class="text-end pe-0">Сума</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var item in sale.SaleItems)
+                {
+                    <tr>
+                        <td class="ps-0">
+                            <span class="fw-bold">@item.ProductName</span>
+                            @if (!string.IsNullOrEmpty(item.Identifier) && item.Identifier.Length > 3)
+                            {
+                                <div class="text-muted" style="font-size: 0.85em;">SN: @item.Identifier</div>
+                            }
+                        </td>
+                        <td class="text-center">@item.Quantity</td>
+                        <td class="text-end pe-0">@((item.SoldSellingPrice * item.Quantity).ToString("N0"))</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+
+        @* 4. ПІДСУМКИ *@
+        <div class="border-top border-dark pt-2 mb-2">
+            <div class="d-flex justify-content-between fw-bold fs-5">
+                <span>ДО СПЛАТИ:</span>
+                <span>@sale.FinalAmount.ToString("N0") грн</span>
+            </div>
+            @if (sale.TotalAmount > sale.FinalAmount)
+            {
+                <div class="d-flex justify-content-between small text-muted">
+                    <span>Знижка:</span>
+                    <span>@((sale.TotalAmount - sale.FinalAmount).ToString("N0")) грн</span>
+                </div>
+            }
+        </div>
+
+        @* 5. ОПЛАТА *@
+        <div class="mb-3 small">
+            <div class="fw-bold border-bottom pb-1 mb-1">ОПЛАТА:</div>
+            @foreach (var p in sale.Payments)
+            {
+                <div class="d-flex justify-content-between">
+                    <span>@p.Method:</span>
+                    <span>@p.Amount.ToString("N0") @(p.Method == "USD" || p.Method == "EUR" ? $"({p.ExchangeRate})" : "")</span>
+                </div>
+            }
+        </div>
+
+        @* 6. ФУТЕР + QR *@
+        <div class="text-center small border-top pt-2 mt-2">
+            <div class="fw-bold mb-1">Гарантія: 30 днів</div>
+            <div class="text-muted" style="font-size: 0.8em;">
+                Збережіть чек для гарантійного обслуговування.
+            </div>
+
+            <div class="mt-3 fw-bold">*** ДЯКУЄМО! ***</div>
+
+            @* QR КОД НА ІНСТАГРАМ *@
+            @if (!string.IsNullOrEmpty(receiptData.StoreInstagramUrl))
+            {
+                <div class="mt-3">
+                    <img src="https://bwipjs-api.metafloor.com/?bcid=qrcode&text=@receiptData.StoreInstagramUrl&scale=3" style="max-width: 80px;" />
+                    <div class="mt-1 fw-bold" style="font-size: 0.9em;">Ми в Instagram</div>
+                </div>
+            }
+
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public int id { get; set; }
+
+    // 👇 Тепер використовуємо DTO
+    private SaleReceiptDto? receiptData;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            // Отримуємо розширені дані з сервера
+            receiptData = await Http.GetFromJsonAsync<SaleReceiptDto>($"api/sales/{id}");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex.Message);
+        }
+    }
+
+    private async Task PrintReceipt()
+    {
+        await JsRuntime.InvokeVoidAsync("print");
+    }
+}
+
+<style>
+    .receipt-container {
+        width: 300px; /* Трохи звузив для кращого вигляду */
+        font-family: 'Courier New', Courier, monospace;
+        background-color: #fff;
+        color: #000;
+        line-height: 1.2;
+    }
+
+    @@media print {
+        .sidebar, .top-row, .no-print-container, .btn, header, footer {
+            display: none !important;
+        }
+
+        body {
+            background-color: #fff;
+            margin: 0;
+            padding: 0;
+        }
+
+        .receipt-container {
+            width: 100%;
+            max-width: 52mm; /* Стандартна ширина друку */
+            box-shadow: none !important;
+            margin: 0;
+            padding: 0;
+            font-size: 11px;
+        }
+
+        .receipt-table th, .receipt-table td {
+            padding: 1px 0;
+        }
+    }
+</style>

@@ -1,0 +1,34 @@
+﻿@using AppleShopikCRM.Client.Models
+
+<div class="card mb-2 shadow-sm border-0 repair-card" @onclick="OnClick" style="cursor: pointer;">
+    <div class="card-body p-2">
+        <div class="d-flex justify-content-between">
+            <span class="badge bg-secondary">#@Ticket.TicketNumber</span>
+            @if (Ticket.Type == RepairType.InternalStock)
+            {
+                <span class="badge bg-primary">🏢 Склад</span>
+            }
+            else
+            {
+
+                <span class="badge bg-warning text-dark">👤 Клієнт</span>
+            }
+        </div>
+
+        <div class="fw-bold mt-1 text-truncate">@Ticket.DeviceModel</div>
+        <div class="small text-muted mb-1">@Ticket.IssueDescription</div>
+
+        <div class="d-flex justify-content-between align-items-center mt-2">
+            <small class="text-muted">@Ticket.CreatedAt.ToString("dd.MM")</small>
+            @if (Ticket.Price > 0)
+            {
+                <span class="badge bg-success">@Ticket.Price ₴</span>
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter] public RepairTicket Ticket { get; set; }
+    [Parameter] public EventCallback OnClick { get; set; }
+}
