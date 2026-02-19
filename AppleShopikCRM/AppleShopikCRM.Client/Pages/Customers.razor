@@ -1,0 +1,856 @@
+﻿@page "/customers"
+
+@using AppleShopikCRM.Client.Models
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.JSInterop
+
+@inject HttpClient Http
+@inject NavigationManager Nav
+@inject AuthenticationStateProvider AuthStateProvider
+@inject IJSRuntime JS
+@rendermode InteractiveWebAssembly
+
+<PageTitle>База клієнтів — Apple Shopik</PageTitle>
+
+<style>
+    :root {
+        --apple-blue: #0071e3;
+        --apple-blue-h: #0077ed;
+        --apple-green: #34c759;
+        --apple-purple: #af52de;
+        --apple-red: #ff3b30;
+        --apple-gray: #f5f5f7;
+        --apple-border: #d2d2d7;
+        --apple-text: #1d1d1f;
+        --apple-sub: #6e6e73;
+        --radius-lg: 14px;
+        --shadow-card: 0 2px 12px rgba(0,0,0,.07), 0 1px 3px rgba(0,0,0,.05);
+    }
+
+    .customers-root {
+        padding: 20px;
+        font-family: -apple-system, 'SF Pro Display', Arial, sans-serif;
+        background: var(--apple-gray);
+        min-height: 100vh;
+        color: var(--apple-text);
+    }
+
+    .page-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+        flex-wrap: wrap;
+        gap: 16px;
+    }
+
+    .page-title {
+        font-size: 1.5rem;
+        font-weight: 700;
+        margin: 0;
+        letter-spacing: -.3px;
+    }
+
+    .search-box {
+        position: relative;
+        max-width: 400px;
+        margin-bottom: 20px;
+    }
+
+    .search-icon {
+        position: absolute;
+        left: 14px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: var(--apple-sub);
+    }
+
+    .search-input {
+        width: 100%;
+        padding: 10px 36px;
+        border-radius: 12px;
+        border: 1.5px solid var(--apple-border);
+        outline: none;
+        font-size: 14px;
+        transition: all .15s;
+    }
+
+        .search-input:focus {
+            border-color: var(--apple-blue);
+            box-shadow: 0 0 0 3px rgba(0,113,227,.1);
+        }
+
+    .search-clear {
+        position: absolute;
+        right: 10px;
+        top: 50%;
+        transform: translateY(-50%);
+        background: var(--apple-border);
+        border: none;
+        border-radius: 50%;
+        width: 18px;
+        height: 18px;
+        font-size: 10px;
+        color: #666;
+        cursor: pointer;
+    }
+
+    .apple-card {
+        background: #fff;
+        border-radius: var(--radius-lg);
+        box-shadow: var(--shadow-card);
+        overflow: hidden;
+    }
+
+    .apple-table {
+        width: 100%;
+        border-collapse: collapse;
+        text-align: left;
+    }
+
+        .apple-table th {
+            padding: 14px 16px;
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--apple-sub);
+            border-bottom: 1px solid var(--apple-border);
+            background: #fafafa;
+            text-transform: uppercase;
+            letter-spacing: .5px;
+        }
+
+        .apple-table td {
+            padding: 14px 16px;
+            font-size: 14px;
+            border-bottom: 1px solid #f0f0f0;
+            vertical-align: middle;
+        }
+
+        .apple-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        .apple-table tr:hover td {
+            background: #fafafa;
+        }
+
+    .avatar {
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        background: var(--apple-blue);
+        color: #fff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 700;
+        font-size: 14px;
+        flex-shrink: 0;
+    }
+
+    .tag {
+        font-size: 11px;
+        padding: 2px 8px;
+        border-radius: 6px;
+        background: var(--apple-gray);
+        border: 1px solid var(--apple-border);
+        color: var(--apple-text);
+        font-weight: 600;
+    }
+
+        .tag.green {
+            background: rgba(52,199,89,.1);
+            border-color: rgba(52,199,89,.3);
+            color: #1a7a35;
+        }
+
+    .btn-apple {
+        border: none;
+        border-radius: 8px;
+        padding: 8px 16px;
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all .15s;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+    }
+
+        .btn-apple.primary {
+            background: var(--apple-blue);
+            color: #fff;
+        }
+
+            .btn-apple.primary:hover {
+                background: var(--apple-blue-h);
+            }
+
+        .btn-apple.outline {
+            background: transparent;
+            border: 1.5px solid var(--apple-border);
+            color: var(--apple-text);
+        }
+
+            .btn-apple.outline:hover {
+                background: var(--apple-gray);
+            }
+
+    /* Modals */
+    .modal-backdrop-apple {
+        position: fixed;
+        inset: 0;
+        background: rgba(0,0,0,.45);
+        backdrop-filter: blur(4px);
+        z-index: 1050;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 16px;
+        animation: fadeIn .15s ease;
+    }
+
+    .modal-sheet {
+        background: #fff;
+        border-radius: 18px;
+        width: 100%;
+        max-width: 500px;
+        box-shadow: 0 20px 60px rgba(0,0,0,.2);
+        display: flex;
+        flex-direction: column;
+        max-height: 90vh;
+    }
+
+        .modal-sheet.lg {
+            max-width: 700px;
+        }
+
+    .ms-header {
+        padding: 18px 20px 14px;
+        border-bottom: 1px solid var(--apple-border);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .ms-title {
+        font-size: 1.1rem;
+        font-weight: 700;
+        margin: 0;
+    }
+
+    .ms-close {
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        background: var(--apple-gray);
+        border: none;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--apple-sub);
+        cursor: pointer;
+    }
+
+    .ms-body {
+        padding: 20px;
+        overflow-y: auto;
+    }
+
+    .ms-footer {
+        padding: 14px 20px;
+        border-top: 1px solid var(--apple-border);
+        display: flex;
+        justify-content: flex-end;
+        gap: 10px;
+        background: #fafafa;
+        border-radius: 0 0 18px 18px;
+    }
+
+    .apple-input {
+        width: 100%;
+        padding: 10px 14px;
+        border: 1.5px solid var(--apple-border);
+        border-radius: 8px;
+        font-size: 14px;
+        outline: none;
+        transition: all .15s;
+    }
+
+        .apple-input:focus {
+            border-color: var(--apple-blue);
+            box-shadow: 0 0 0 3px rgba(0,113,227,.1);
+        }
+
+    .apple-label {
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--apple-sub);
+        display: block;
+        margin-bottom: 6px;
+        margin-top: 12px;
+    }
+
+    .id-badge {
+        background: rgba(255,255,255,0.2);
+        padding: 4px 8px;
+        border-radius: 6px;
+        font-family: monospace;
+        font-size: 13px;
+        color: #fff;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        margin-top: 6px;
+        margin-left: 42px;
+        transition: background 0.2s;
+    }
+
+        .id-badge:hover {
+            background: rgba(255,255,255,0.3);
+        }
+
+    @@keyframes fadeIn {
+        from {
+            opacity: 0;
+        }
+
+        to {
+            opacity: 1;
+        }
+    }
+</style>
+
+<div class="customers-root">
+    <div class="page-header">
+        <h1 class="page-title"><i class="bi bi-people-fill me-2" style="color:var(--apple-blue);"></i>База клієнтів</h1>
+
+        <div style="display:flex; gap: 10px;">
+            @* 🔥 Кнопка розсилки ТІЛЬКИ для адмінів *@
+            @if (isAdmin)
+            {
+                <button class="btn-apple outline" style="color: #084298; border-color: #b6d4fe; background: #e8f4fd;" @onclick="OpenBroadcastModal">
+                    <i class="bi bi-telegram"></i> Розсилка (@connectedTgCount)
+                </button>
+            }
+            <button class="btn-apple primary" @onclick="() => OpenModal(null)">
+                <i class="bi bi-person-plus-fill"></i> Новий клієнт
+            </button>
+        </div>
+    </div>
+
+    <div class="search-box">
+        <i class="bi bi-search search-icon"></i>
+        <input type="text" class="search-input" placeholder="Ім'я, телефон, email або ID..." value="@searchTerm" @oninput="OnSearch" />
+        @if (!string.IsNullOrEmpty(searchTerm))
+        {
+            <button class="search-clear" @onclick="ClearSearch">✕</button>
+        }
+    </div>
+
+    @if (isLoading)
+    {
+        <div style="text-align:center; padding: 40px; color:var(--apple-sub);">
+            <div class="spinner-border spinner-border-sm me-2"></div> Завантаження...
+        </div>
+    }
+    else if (!customers.Any())
+    {
+        <div style="text-align:center; padding: 60px; color:var(--apple-sub);">
+            <i class="bi bi-people" style="font-size: 3rem; opacity: 0.3; display:block; margin-bottom: 10px;"></i>
+            Клієнтів не знайдено
+        </div>
+    }
+    else
+    {
+        <div class="apple-card">
+            <table class="apple-table">
+                <thead>
+                    <tr>
+                        <th>Клієнт</th>
+                        <th>Контакти</th>
+                        <th style="text-align:center;">Покупок</th>
+                        <th style="text-align:right;">Витрачено</th>
+                        @if (isAdmin)
+                        {
+                            <th style="text-align:right;">Прибуток</th>
+                        }
+                        <th style="text-align:center;">Гарантії</th>
+                        <th style="text-align:right;">Дії</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var c in customers)
+                    {
+                        <tr>
+                            <td>
+                                <div style="display:flex; align-items:center; gap:12px;">
+                                    <div class="avatar">@(c.Name.Length > 0 ? c.Name[0].ToString().ToUpper() : "?")</div>
+                                    <div>
+                                        <div style="font-weight:600; color:var(--apple-text);">@c.Name</div>
+                                        <div style="font-size: 11px; color: var(--apple-sub); margin-top: 2px;">ID: @c.Id</div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td>
+                                <div style="font-weight:500;">@c.Phone</div>
+                                @if (!string.IsNullOrEmpty(c.Email))
+                                {
+                                    <div style="font-size:12px; color:var(--apple-sub);">@c.Email</div>
+                                }
+                            </td>
+                            <td style="text-align:center;">
+                                <span class="tag">@c.TotalPurchases шт.</span>
+                            </td>
+                            <td style="text-align:right; font-weight:700; color:var(--apple-green);">
+                                @c.TotalSpent.ToString("N0") грн
+                            </td>
+                            @if (isAdmin)
+                            {
+                                <td style="text-align:right; font-weight:700; color:var(--apple-purple);">
+                                    @c.TotalProfit.ToString("N0") грн
+                                </td>
+                            }
+                            <td style="text-align:center;">
+                                @{
+                                    var activeW = c.Warranties?.Count(w => w.IsActive) ?? 0;
+                                }
+                                @if (activeW > 0)
+                                {
+                                    <span class="tag green" title="Активні"><i class="bi bi-shield-check"></i> @activeW</span>
+                                }
+                                else
+                                {
+                                    <span style="color:var(--apple-sub); font-size:12px;">—</span>
+                                }
+                            </td>
+                            <td style="text-align:right;">
+                                <button class="btn-apple outline" style="padding: 6px 10px; margin-right:4px;" @onclick="() => ViewCustomer(c)" title="Деталі">
+                                    <i class="bi bi-eye"></i>
+                                </button>
+                                <button class="btn-apple outline" style="padding: 6px 10px;" @onclick="() => OpenModal(c)" title="Редагувати">
+                                    <i class="bi bi-pencil"></i>
+                                </button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>
+
+@* МОДАЛ: СТВОРЕННЯ / РЕДАГУВАННЯ *@
+@if (showModal)
+{
+    <div class="modal-backdrop-apple" @onclick="CloseModal">
+        <div class="modal-sheet" @onclick:stopPropagation>
+            <div class="ms-header">
+                <h3 class="ms-title"><i class="bi bi-person-fill me-2" style="color:var(--apple-blue);"></i>@(editingCustomer.Id == 0 ? "Новий клієнт" : "Редагування")</h3>
+                <button class="ms-close" @onclick="CloseModal"><i class="bi bi-x"></i></button>
+            </div>
+            <div class="ms-body">
+                @if (!string.IsNullOrEmpty(modalError))
+                {
+                    <div style="background:rgba(255,59,48,.1); color:var(--apple-red); padding:10px; border-radius:8px; font-size:13px; margin-bottom:12px;">
+                        <i class="bi bi-exclamation-circle me-1"></i> @modalError
+                    </div>
+                }
+                <label class="apple-label" style="margin-top:0;">Ім'я та прізвище *</label>
+                <input class="apple-input" @bind="editingCustomer.Name" placeholder="Іван Петренко" />
+
+                <label class="apple-label">Телефон *</label>
+                <input class="apple-input" @bind="editingCustomer.Phone" placeholder="+380..." />
+
+                <label class="apple-label">Email</label>
+                <input class="apple-input" @bind="editingCustomer.Email" type="email" placeholder="email@example.com" />
+
+                <label class="apple-label"><i class="bi bi-telegram text-primary me-1"></i> Посилання на Telegram</label>
+                <input class="apple-input" @bind="editingCustomer.TelegramUsername" placeholder="https://t.me/username" />
+
+                <label class="apple-label">Нотатки</label>
+                <textarea class="apple-input" rows="3" @bind="editingCustomer.Notes" placeholder="Додаткова інформація..."></textarea>
+            </div>
+            <div class="ms-footer">
+                <button class="btn-apple outline" @onclick="CloseModal">Скасувати</button>
+                <button class="btn-apple primary" @onclick="SaveCustomer" disabled="@isSaving">
+                    @if (isSaving)
+                    {
+                        <span class="spinner-border spinner-border-sm me-1"></span>
+                    }
+                    <i class="bi bi-check-lg me-1"></i> Зберегти
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+@* МОДАЛ: ПЕРЕГЛЯД ДЕТАЛЕЙ *@
+@if (viewingCustomer != null)
+{
+    <div class="modal-backdrop-apple" @onclick="() => viewingCustomer = null">
+        <div class="modal-sheet lg" @onclick:stopPropagation>
+            <div class="ms-header" style="background: var(--apple-text); color: #fff; border-bottom: none; border-radius: 18px 18px 0 0; align-items: flex-start;">
+                <div style="display: flex; flex-direction: column;">
+                    <h3 class="ms-title" style="display:flex; align-items:center; gap:10px;">
+                        <div style="width:32px; height:32px; background:#fff; color:var(--apple-text); border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:14px;">
+                            @(viewingCustomer.Name.Length > 0 ? viewingCustomer.Name[0].ToString().ToUpper() : "?")
+                        </div>
+                        @viewingCustomer.Name
+                    </h3>
+
+                    <div style="display: flex; gap: 8px; margin-top: 6px; margin-left: 42px;">
+                        <span class="id-badge" @onclick="() => CopyToClipboard(viewingCustomer.Id.ToString())" title="Скопіювати ID">
+                            ID: @viewingCustomer.Id <i class="bi bi-copy"></i>
+                        </span>
+                        <span class="id-badge" style="background: rgba(10, 132, 255, 0.2); color: #cce4ff; border: 1px solid rgba(10, 132, 255, 0.3);"
+                              @onclick="@(() => CopyToClipboard($"https://t.me/appleshopikofficial_bot?start=c_{viewingCustomer.Id}"))"
+                              title="Скопіювати посилання для клієнта">
+                            <i class="bi bi-telegram"></i> Лінк на бота <i class="bi bi-copy ms-1"></i>
+                        </span>
+                    </div>
+                </div>
+                <button class="ms-close" style="background:rgba(255,255,255,.2); color:#fff;" @onclick="() => viewingCustomer = null"><i class="bi bi-x"></i></button>
+            </div>
+            <div class="ms-body" style="background:#fafafa;">
+
+                <div style="display:grid; grid-template-columns: repeat(@(isAdmin ? 4 : 3), 1fr); gap:12px; margin-bottom: 20px;">
+                    <div style="background:#fff; border:1px solid var(--apple-border); border-radius:12px; padding:12px;">
+                        <div style="font-size:11px; color:var(--apple-sub); text-transform:uppercase; font-weight:700;">Контакти</div>
+                        <div style="font-weight:600; margin-top:4px;">@viewingCustomer.Phone</div>
+                        <div style="font-size:12px; color:var(--apple-sub);">@(string.IsNullOrEmpty(viewingCustomer.Email) ? "Немає email" : viewingCustomer.Email)</div>
+                    </div>
+                    <div style="background:#fff; border:1px solid var(--apple-border); border-radius:12px; padding:12px;">
+                        <div style="font-size:11px; color:var(--apple-sub); text-transform:uppercase; font-weight:700;">Покупок</div>
+                        <div style="font-size:1.4rem; font-weight:700; color:var(--apple-blue); margin-top:2px;">@viewingCustomer.TotalPurchases</div>
+                    </div>
+                    <div style="background:#fff; border:1px solid var(--apple-border); border-radius:12px; padding:12px;">
+                        <div style="font-size:11px; color:var(--apple-sub); text-transform:uppercase; font-weight:700;">Витрачено</div>
+                        <div style="font-size:1.4rem; font-weight:700; color:var(--apple-green); margin-top:2px;">@viewingCustomer.TotalSpent.ToString("N0") <span style="font-size:14px;">₴</span></div>
+                    </div>
+                    @if (isAdmin)
+                    {
+                        <div style="background:#fff; border:1px solid var(--apple-border); border-radius:12px; padding:12px;">
+                            <div style="font-size:11px; color:var(--apple-sub); text-transform:uppercase; font-weight:700;">Прибуток</div>
+                            <div style="font-size:1.4rem; font-weight:700; color:var(--apple-purple); margin-top:2px;">@viewingCustomer.TotalProfit.ToString("N0") <span style="font-size:14px;">₴</span></div>
+                        </div>
+                    }
+                </div>
+
+                @if (!string.IsNullOrEmpty(viewingCustomer.TelegramUsername))
+                {
+                    <div style="background:#e8f4fd; border:1px solid #b6d4fe; padding:12px; border-radius:12px; margin-bottom:20px; display: flex; align-items: center; justify-content: space-between;">
+                        <div>
+                            <div style="font-size:11px; color:#084298; text-transform:uppercase; font-weight:700;"><i class="bi bi-telegram"></i> Telegram</div>
+                            <div style="font-weight:600; margin-top:4px; color: #052c65;">@viewingCustomer.TelegramUsername</div>
+                        </div>
+                        <a href="@(viewingCustomer.TelegramUsername.StartsWith("http") ? viewingCustomer.TelegramUsername : $"https://t.me/{viewingCustomer.TelegramUsername.Replace("@", "")}")" target="_blank" class="btn-apple primary" style="padding: 6px 12px; font-size: 12px;">
+                            Написати
+                        </a>
+                    </div>
+                }
+
+                @if (!string.IsNullOrEmpty(viewingCustomer.Notes))
+                {
+                    <div style="background:#fff; border:1px solid #ffe58f; background-color: #fffac8; padding:12px; border-radius:12px; font-size:13px; margin-bottom:20px;">
+                        <strong>Нотатки:</strong> @viewingCustomer.Notes
+                    </div>
+                }
+
+                <div style="font-size:14px; font-weight:700; margin-bottom:10px;"><i class="bi bi-bag-check text-primary me-1"></i> Історія покупок</div>
+                @if (viewingCustomer.Purchases == null || !viewingCustomer.Purchases.Any())
+                {
+                    <div style="text-align:center; padding:20px; color:var(--apple-sub); border:1px dashed var(--apple-border); border-radius:12px; margin-bottom: 20px;">Покупок ще не було</div>
+                }
+                else
+                {
+                    <div style="display:flex; flex-direction:column; gap:8px; margin-bottom: 20px;">
+                        @foreach (var p in viewingCustomer.Purchases.OrderByDescending(x => x.Date))
+                        {
+                            <div style="background:#fff; border:1px solid var(--apple-border); border-radius:10px; padding:12px; display:flex; justify-content:space-between; align-items:center;">
+                                <div>
+                                    <div style="font-weight:600; font-size:14px; color:var(--apple-text);">@p.ItemName</div>
+                                    <div style="font-size:12px; color:var(--apple-sub); margin-top:2px;">
+                                        @p.Date.ToString("dd.MM.yyyy HH:mm") • @p.Quantity шт.
+                                        @if (!string.IsNullOrEmpty(p.Details))
+                                        {
+                                            <span> • @p.Details</span>
+                                        }
+                                    </div>
+                                </div>
+                                <div style="text-align:right;">
+                                    <div style="font-weight:700; color:var(--apple-text);">@p.Price.ToString("N0") ₴</div>
+                                    @if (isAdmin)
+                                    {
+                                        <div style="font-size:11px; font-weight:600; color:var(--apple-purple); margin-top:2px;">
+                                            Прибуток: @p.Profit.ToString("N0") ₴
+                                        </div>
+                                    }
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
+
+                <div style="font-size:14px; font-weight:700; margin-bottom:10px;"><i class="bi bi-shield-check text-success me-1"></i> Історія гарантій</div>
+                @if (viewingCustomer.Warranties == null || !viewingCustomer.Warranties.Any())
+                {
+                    <div style="text-align:center; padding:20px; color:var(--apple-sub); border:1px dashed var(--apple-border); border-radius:12px;">Гарантій ще не було</div>
+                }
+                else
+                {
+                    <div style="display:flex; flex-direction:column; gap:10px;">
+                        @foreach (var w in viewingCustomer.Warranties.OrderByDescending(x => x.StartDate))
+                        {
+                            <div style="background:#fff; border:1px solid var(--apple-border); border-radius:12px; padding:14px; border-left: 4px solid @(w.IsActive ? "var(--apple-green)" : "var(--apple-sub)");">
+                                <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+                                    <div>
+                                        <div style="font-weight:700; font-size:15px;">@w.DeviceModel</div>
+                                        @if (!string.IsNullOrEmpty(w.Imei))
+                                        {
+                                            <div style="font-size:12px; color:var(--apple-sub); font-family:monospace;">IMEI: @w.Imei</div>
+                                        }
+                                        <div style="font-size:12px; color:var(--apple-sub); margin-top:4px;">
+                                            <span class="tag">@w.WarrantyType</span> • @w.StartDate.ToString("dd.MM.yyyy") — @w.EndDate.ToString("dd.MM.yyyy")
+                                        </div>
+                                    </div>
+                                    <div style="text-align:right;">
+                                        @if (w.IsActive)
+                                        {
+                                            <div style="color:var(--apple-green); font-weight:700; font-size:13px;"><i class="bi bi-check-circle-fill"></i> Активна</div>
+                                            <div style="font-size:11px; color:var(--apple-sub);">Ще @w.DaysLeft дн.</div>
+                                        }
+                                        else
+                                        {
+                                            <div style="color:var(--apple-sub); font-weight:600; font-size:13px;">Прострочена</div>
+                                        }
+                                    </div>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+            <div class="ms-footer">
+                <button class="btn-apple outline" @onclick="EditFromView"><i class="bi bi-pencil me-1"></i>Редагувати</button>
+                <button class="btn-apple primary" @onclick="() => viewingCustomer = null">Закрити</button>
+            </div>
+        </div>
+    </div>
+}
+
+@* 🔥 МОДАЛ: РОЗСИЛКА TELEGRAM *@
+@if (showBroadcastModal)
+{
+    <div class="modal-backdrop-apple" @onclick="() => showBroadcastModal = false">
+        <div class="modal-sheet" @onclick:stopPropagation>
+            <div class="ms-header">
+                <h3 class="ms-title"><i class="bi bi-send-fill me-2" style="color:#084298;"></i>Telegram Розсилка</h3>
+                <button class="ms-close" @onclick="() => showBroadcastModal = false"><i class="bi bi-x"></i></button>
+            </div>
+            <div class="ms-body">
+                <div style="background:#e8f4fd; color:#084298; padding:12px; border-radius:8px; font-size:13px; margin-bottom:16px; border: 1px solid #b6d4fe;">
+                    <i class="bi bi-info-circle-fill me-1"></i> Це повідомлення отримають <strong>@connectedTgCount</strong> клієнтів, які підключені до бота Apple Shopik.
+                </div>
+
+                <label class="apple-label" style="margin-top:0;">Текст повідомлення</label>
+                <textarea class="apple-input" rows="6" @bind="broadcastMessage" placeholder="Введіть текст розсилки... Підтримується HTML (наприклад: <b>Жирний</b>)"></textarea>
+                <div style="font-size: 11px; color: var(--apple-sub); margin-top: 6px;">
+                    Використовуйте <code>&lt;b&gt;текст&lt;/b&gt;</code> для жирного або <code>&lt;i&gt;текст&lt;/i&gt;</code> для курсиву.
+                </div>
+            </div>
+            <div class="ms-footer">
+                <button class="btn-apple outline" @onclick="() => showBroadcastModal = false">Скасувати</button>
+                <button class="btn-apple primary" @onclick="SendBroadcast" disabled="@isBroadcasting">
+                    @if (isBroadcasting)
+                    {
+                        <span class="spinner-border spinner-border-sm me-1"></span>
+                    }
+                    <i class="bi bi-telegram me-1"></i> Відправити всім
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<CustomerDto> customers = new();
+    private bool isLoading = true;
+    private string searchTerm = "";
+    private System.Timers.Timer? searchTimer;
+
+    private bool showModal = false;
+    private bool isSaving = false;
+    private string modalError = "";
+    private CustomerDto editingCustomer = new();
+    private CustomerDto? viewingCustomer;
+
+    private bool isAdmin = false;
+
+    // Змінні для розсилки
+    private int connectedTgCount = 0;
+    private bool showBroadcastModal = false;
+    private string broadcastMessage = "";
+    private bool isBroadcasting = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        isAdmin = authState.User.IsInRole("Admin");
+
+        // Підтягуємо кількість для розсилки, якщо Адмін
+        if (isAdmin)
+        {
+            try
+            {
+                connectedTgCount = await Http.GetFromJsonAsync<int>("api/telegram/connected-count");
+            }
+            catch { }
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await LoadCustomers();
+            StateHasChanged();
+        }
+    }
+
+    private async Task LoadCustomers(string? search = null)
+    {
+        isLoading = true;
+        var url = string.IsNullOrWhiteSpace(search) ? "api/customers" : $"api/customers?search={Uri.EscapeDataString(search)}";
+        customers = await Http.GetFromJsonAsync<List<CustomerDto>>(url) ?? new();
+        isLoading = false;
+    }
+
+    private void OnSearch(ChangeEventArgs e)
+    {
+        searchTerm = e.Value?.ToString() ?? "";
+        searchTimer?.Dispose();
+        searchTimer = new System.Timers.Timer(400);
+        searchTimer.Elapsed += async (_, _) =>
+        {
+            searchTimer?.Dispose();
+            await InvokeAsync(async () =>
+            {
+                await LoadCustomers(searchTerm);
+                StateHasChanged();
+            });
+        };
+        searchTimer.AutoReset = false;
+        searchTimer.Start();
+    }
+
+    private async Task ClearSearch()
+    {
+        searchTerm = "";
+        await LoadCustomers();
+    }
+
+    private void OpenModal(CustomerDto? customer)
+    {
+        editingCustomer = customer != null
+            ? new CustomerDto
+            {
+                Id = customer.Id,
+                Name = customer.Name,
+                Phone = customer.Phone,
+                Email = customer.Email,
+                Notes = customer.Notes,
+                TelegramUsername = customer.TelegramUsername
+            }
+            : new CustomerDto();
+        modalError = "";
+        showModal = true;
+    }
+
+    private void CloseModal() => showModal = false;
+
+    private async Task SaveCustomer()
+    {
+        if (string.IsNullOrWhiteSpace(editingCustomer.Name) || string.IsNullOrWhiteSpace(editingCustomer.Phone))
+        {
+            modalError = "Ім'я та телефон — обов'язкові поля";
+            return;
+        }
+
+        isSaving = true;
+        modalError = "";
+
+        try
+        {
+            HttpResponseMessage response;
+            if (editingCustomer.Id == 0)
+                response = await Http.PostAsJsonAsync("api/customers", editingCustomer);
+            else
+                response = await Http.PutAsJsonAsync($"api/customers/{editingCustomer.Id}", editingCustomer);
+
+            if (response.IsSuccessStatusCode)
+            {
+                showModal = false;
+                await LoadCustomers(searchTerm);
+            }
+            else
+            {
+                modalError = await response.Content.ReadAsStringAsync();
+            }
+        }
+        finally { isSaving = false; }
+    }
+
+    private void EditFromView()
+    {
+        var customer = viewingCustomer;
+        viewingCustomer = null;
+        OpenModal(customer);
+    }
+
+    private void ViewCustomer(CustomerDto c) => viewingCustomer = c;
+
+    private async Task CopyToClipboard(string text)
+    {
+        await JS.InvokeVoidAsync("navigator.clipboard.writeText", text);
+    }
+
+    // Методи розсилки
+    private void OpenBroadcastModal()
+    {
+        broadcastMessage = "";
+        showBroadcastModal = true;
+    }
+
+    private async Task SendBroadcast()
+    {
+        if (string.IsNullOrWhiteSpace(broadcastMessage)) return;
+
+        var confirm = await JS.InvokeAsync<bool>("confirm", $"Відправити це повідомлення {connectedTgCount} клієнтам?");
+        if (!confirm) return;
+
+        isBroadcasting = true;
+        try
+        {
+            var res = await Http.PostAsJsonAsync("api/telegram/broadcast", new { Message = broadcastMessage });
+            if (res.IsSuccessStatusCode)
+            {
+                await JS.InvokeVoidAsync("alert", "✅ Розсилка успішно відправлена!");
+                showBroadcastModal = false;
+            }
+            else
+            {
+                await JS.InvokeVoidAsync("alert", "❌ Помилка при відправці розсилки.");
+            }
+        }
+        catch (Exception ex)
+        {
+            await JS.InvokeVoidAsync("alert", $"❌ Мережева помилка: {ex.Message}");
+        }
+        finally
+        {
+            isBroadcasting = false;
+        }
+    }
+}

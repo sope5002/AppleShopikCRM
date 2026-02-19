@@ -1,4 +1,6 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using AppleShopikCRM.Client.Models;
+using AppleShopikCRM.Helpers;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using AppleShopikCRM.Client.Models;
 
@@ -30,6 +32,7 @@ namespace AppleShopikCRM.Controllers
                     a.SellingPrice
                 })
                 .ToListAsync();
+
             return Ok(list);
         }
 
@@ -38,6 +41,19 @@ namespace AppleShopikCRM.Controllers
         public async Task<IActionResult> Restock([FromBody] RestockRequest request)
         {
             var accessory = await _context.AccessoryStock.FirstOrDefaultAsync(a => a.ProductId == request.ProductId);
+
+            // 🔥 1. НАДІЙНИЙ ПОШУК МЕНЕДЖЕРА (навіть якщо Claim має довгу адресу)
+           var managerName = User.FindFirst(ClaimTypes.UserData)?.Value
+               ?? User.FindFirst(ClaimTypes.Name)?.Value
+               ?? "Невідомий менеджер";
+
+            var product = await _context.Products.FirstOrDefaultAsync(p => p.Id == request.ProductId);
+            if (product == null) return BadRequest("Помилка: Товар не знайдено!");
+
+            int realProductId = product.Id;
+
+            var accessory = await _context.AccessoryStock
+                .FirstOrDefaultAsync(a => a.ProductId == realProductId && a.StoreId == currentStoreId);
 
             if (accessory == null)
             {
@@ -61,17 +77,29 @@ namespace AppleShopikCRM.Controllers
 
                 // ВАЖЛИВО: Оновлюємо ціни ТІЛЬКИ якщо вони були введені (тобто > 0)
                 // Це захистить ціну від затирання нулями, коли працює Менеджер
-                if (request.NewPurchasePrice > 0)
+                    if (request.NewPurchasePrice > 0)
                     accessory.PurchasePrice = request.NewPurchasePrice;
 
-                if (request.NewSellingPrice > 0)
+                    if (request.NewSellingPrice > 0)
                     accessory.SellingPrice = request.NewSellingPrice;
 
                 accessory.LastUpdated = DateTime.Now;
             }
 
+            // Записуємо історію
+            var historyRecord = new RestockHistory
+            {
+                ProductId = realProductId,
+                StoreId = currentStoreId,
+                AddedQuantity = request.QuantityToAdd,
+                ManagerName = managerName, // Тепер тут буде правильне ім'я
+                Date = TimeHelper.GetUkraineTime()
+            };
+
+            _context.RestockHistories.Add(historyRecord);
             await _context.SaveChangesAsync();
+
             return Ok();
         }
-    }   
+    }
 }

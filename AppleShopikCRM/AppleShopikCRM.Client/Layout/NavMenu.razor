@@ -2,7 +2,7 @@
 @using Blazored.LocalStorage
 @using AppleShopikCRM.Client @* Для доступу до CustomAuthStateProvider *@
 
-@using Microsoft.AspNetCore.Components.Web 
+@using Microsoft.AspNetCore.Components.Web
 @rendermode InteractiveWebAssembly
 
 @inject AuthenticationStateProvider AuthStateProvider
@@ -13,54 +13,54 @@
 <div class="top-row ps-3 navbar navbar-dark">
     <div class="container-fluid">
         <a class="navbar-brand" href="">AppleShopik CRM</a>
-    </div>
+        </div>
 </div>
 
-<div class="nav-scrollable">
+        <div class="nav-scrollable">
     <nav class="flex-column">
 
         @* Основні розділи (бачать усі авторизовані) *@
         <div class="nav-item px-3">
             <NavLink class="nav-link" href="sales">
                 <i class="bi bi-cart-fill me-2"></i> Продаж
-            </NavLink>
-        </div>
+                    </NavLink>
+                </div>
 
         <div class="nav-item px-3">
             <NavLink class="nav-link" href="inventory">
                 <i class="bi bi-box-seam-fill me-2"></i> Склад
-            </NavLink>
-        </div>
+                    </NavLink>
+                </div>
 
         <div class="nav-item px-3">
             <NavLink class="nav-link" href="cash-register">
                 <i class="bi bi-cash-stack me-2"></i> Каса / Витрати
-            </NavLink>
-        </div>
+                    </NavLink>
+                </div>
         <div class="nav-item px-3">
             <NavLink class="nav-link" href="repairs">
                 <span class="bi bi-tools" aria-hidden="true"></span> Ремонти
-            </NavLink>
-        </div>
+                        </NavLink>
+                    </div>
 
         @* 👇 Цей блок бачить ТІЛЬКИ користувач з роллю "Admin" *@
-        <AuthorizeView Roles="Admin">
-            <Authorized>
+                <AuthorizeView Roles="Admin">
+                    <Authorized>
                 <div class="border-top my-2 mx-3 border-secondary"></div>
 
                 <div class="nav-item px-3">
                     <NavLink class="nav-link" href="reports">
                         <i class="bi bi-graph-up-arrow me-2"></i> Звіти
-                    </NavLink>
-                </div>
+                            </NavLink>
+                        </div>
 
                 <div class="nav-item px-3">
                     <NavLink class="nav-link" href="admin">
                         <i class="bi bi-shield-lock-fill me-2"></i> Адміністрування
-                    </NavLink>
-                </div>
-            </Authorized>
-        </AuthorizeView>
+                            </NavLink>
+                        </div>
+                    </Authorized>
+                </AuthorizeView>
 
         <div class="border-top my-2 mx-3 border-secondary"></div>
 
@@ -68,7 +68,7 @@
         <div class="px-3 mt-3">
             <button class="btn @(isShiftOpen ? "btn-outline-danger" : "btn-success") w-100 text-start" @onclick="ToggleShift">
                 <i class="bi bi-power me-2"></i> @(isShiftOpen ? "Закрити зміну" : "Відкрити зміну")
-            </button>
+                        </button>
         </div>
         <div class="px-3 mt-2">
 
@@ -76,18 +76,18 @@
 
                 <i class="bi bi-person-circle me-2"></i> Змінити користувача
 
-            </button>
+                    </button>
 
+                </div>
+
+            </nav>
         </div>
-
-    </nav>
-</div>
 </CascadingAuthenticationState>
 @code {
     private bool isShiftOpen = false;
 
     private void ToggleShift()
-    {
+            {
         isShiftOpen = !isShiftOpen;
         // Тут буде логіка зміни
     }

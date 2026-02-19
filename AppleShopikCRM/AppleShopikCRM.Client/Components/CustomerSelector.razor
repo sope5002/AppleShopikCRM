@@ -1,0 +1,393 @@
+﻿@using AppleShopikCRM.Client.Models
+@using System.Text.Json
+@using System.Net.Http.Json
+@inject HttpClient Http
+@inject IJSRuntime JS
+
+<style>
+    .cs-box {
+        background: #fff;
+        border: 1px solid var(--apple-border, #d2d2d7);
+        border-radius: 16px;
+        padding: 20px;
+        box-shadow: 0 4px 12px rgba(0,0,0,.03);
+    }
+
+    .cs-title {
+        font-size: 13px;
+        font-weight: 700;
+        text-transform: uppercase;
+        color: var(--apple-sub, #6e6e73);
+        margin-bottom: 16px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        letter-spacing: 0.5px;
+    }
+
+    .cs-input-wrapper {
+        position: relative;
+        width: 100%;
+    }
+
+    .cs-input {
+        width: 100%;
+        padding: 12px 16px 12px 40px;
+        border: 1.5px solid var(--apple-border, #d2d2d7);
+        border-radius: 12px;
+        font-size: 15px;
+        outline: none;
+        transition: border-color .15s, box-shadow .15s;
+        background: #fff;
+        color: var(--apple-text, #1d1d1f);
+    }
+
+        .cs-input:focus {
+            border-color: var(--apple-blue, #0071e3);
+            box-shadow: 0 0 0 4px rgba(0,113,227,.1);
+        }
+
+    .cs-search-icon {
+        position: absolute;
+        left: 14px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: var(--apple-sub, #6e6e73);
+        font-size: 16px;
+    }
+
+    .cs-btn {
+        padding: 10px 18px;
+        border-radius: 10px;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        border: none;
+        transition: all .15s;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .cs-btn-primary {
+        background: var(--apple-blue, #0071e3);
+        color: #fff;
+    }
+
+        .cs-btn-primary:hover:not(:disabled) {
+            background: var(--apple-blue-h, #0077ed);
+            box-shadow: 0 4px 10px rgba(0,113,227,.2);
+        }
+
+    .cs-btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+
+    .cs-card {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        padding: 14px;
+        background: rgba(52,199,89,.06);
+        border-radius: 12px;
+        border: 1px solid rgba(52,199,89,.2);
+    }
+
+    .cs-avatar {
+        width: 42px;
+        height: 42px;
+        border-radius: 50%;
+        background: var(--apple-green, #34c759);
+        color: #fff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 700;
+        font-size: 16px;
+    }
+
+    .autocomplete-dropdown {
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        background: #fff;
+        border: 1px solid var(--apple-border, #d2d2d7);
+        border-radius: 12px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        z-index: 100;
+        max-height: 220px;
+        overflow-y: auto;
+        margin-top: 8px;
+        overflow: hidden;
+    }
+
+    .ac-item {
+        padding: 12px 16px;
+        cursor: pointer;
+        font-size: 14px;
+        border-bottom: 1px solid #f0f0f0;
+        display: flex;
+        flex-direction: column;
+        transition: background 0.15s;
+    }
+
+        .ac-item:last-child {
+            border-bottom: none;
+        }
+
+        .ac-item:hover {
+            background: rgba(0,113,227,.05);
+        }
+
+    .create-form-box {
+        margin-top: 16px;
+        background: #fdfdfd;
+        border: 1px dashed var(--apple-blue, #0071e3);
+        border-radius: 12px;
+        padding: 16px;
+        animation: fadeIn 0.3s ease;
+    }
+
+    @@keyframes fadeIn {
+        from
+
+    {
+        opacity: 0;
+        transform: translateY(-5px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+
+    }
+</style>
+
+<div class="cs-box">
+    <div class="cs-title">
+        <span><i class="bi bi-person-check-fill me-1" style="color: var(--apple-blue, #0071e3);"></i> Клієнт</span>
+        @if (SelectedCustomer != null)
+        {
+            <button class="btn btn-link text-danger p-0 m-0 text-decoration-none" style="font-size:12px; font-weight:600;" @onclick="ClearCustomer">
+                <i class="bi bi-x-circle"></i> Змінити
+            </button>
+        }
+    </div>
+
+    @if (SelectedCustomer != null)
+    {
+        @* Картка обраного клієнта *@
+        <div class="cs-card">
+            <div class="cs-avatar">@(string.IsNullOrEmpty(SelectedCustomer.Name) ? "?" : SelectedCustomer.Name.FirstOrDefault().ToString().ToUpper())</div>
+            <div style="flex: 1;">
+                <div style="font-weight: 700; font-size: 15px; color: var(--apple-text, #1d1d1f);">@SelectedCustomer.Name</div>
+                <div style="font-size: 13px; color: var(--apple-sub, #6e6e73); font-family: monospace; margin-top: 2px;">@SelectedCustomer.Phone</div>
+            </div>
+            @if (SelectedCustomer.Warranties != null && SelectedCustomer.Warranties.Any(w => w.IsActive))
+            {
+                <span class="badge bg-success bg-opacity-10 text-success border border-success px-2 py-1 rounded-pill" title="Є активні гарантії">
+                    <i class="bi bi-shield-check me-1"></i> Гарантія
+                </span>
+            }
+        </div>
+    }
+    else
+    {
+        @* Поле живого пошуку (Автодоповнення) *@
+        <div class="cs-input-wrapper">
+            <i class="bi bi-search cs-search-icon"></i>
+            <input type="text" class="cs-input" placeholder="Введіть номер телефону або ім'я..."
+                   value="@phoneInput" @oninput="OnSearchInput" autocomplete="off" />
+
+            @if (isSearching)
+            {
+                <span class="spinner-border spinner-border-sm" style="position: absolute; right: 16px; top: 50%; transform: translateY(-50%); color: var(--apple-sub);"></span>
+            }
+
+            @if (isDropdownOpen && customerSuggestions.Any())
+            {
+                <div class="autocomplete-dropdown">
+                    @foreach (var c in customerSuggestions)
+                    {
+                        <div class="ac-item" @onclick="() => SelectExistingCustomer(c)">
+                            <div style="font-weight: 700; color: var(--apple-text);">@c.Phone</div>
+                            <div style="font-size: 12px; color: var(--apple-sub); margin-top: 2px;">@c.Name</div>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+
+        @* Форма створення (показується автоматично, якщо ввели > 3 символів і нічого не знайдено) *@
+        @if (phoneInput.Length > 3 && !customerSuggestions.Any() && !isSearching)
+        {
+            <div class="create-form-box">
+                <div style="font-size: 12px; font-weight: 700; color: var(--apple-blue); margin-bottom: 10px;">
+                    <i class="bi bi-person-plus-fill me-1"></i> Новий клієнт
+                </div>
+                <div style="display: flex; gap: 10px;">
+                    <input class="cs-input" style="padding: 10px 14px;" placeholder="Введіть ім'я клієнта *" @bind="newName" />
+                    <button class="cs-btn cs-btn-primary" @onclick="CreateAndSelect" disabled="@(string.IsNullOrWhiteSpace(newName))">
+                        <i class="bi bi-check-lg me-1"></i> Додати
+                    </button>
+                </div>
+            </div>
+        }
+
+        @* Кнопка: Анонімний продаж *@
+        <div style="text-align: center; margin-top: 16px;">
+            <button class="btn btn-link text-muted text-decoration-none" style="font-size: 13px; font-weight: 600;" @onclick="SkipCustomer">
+                Продовжити без клієнта (Анонімно) <i class="bi bi-arrow-right"></i>
+            </button>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public EventCallback<CustomerDto?> OnCustomerSelected { get; set; }
+
+    public CustomerDto? SelectedCustomer { get; private set; }
+
+    public int? CustomerId => SelectedCustomer?.Id;
+    public string? CustomerPhone => SelectedCustomer == null ? phoneInput : null;
+    public string? CustomerName => newName;
+
+    private string phoneInput = "";
+    private string newName = "";
+
+    private bool isSearching = false;
+    private bool isDropdownOpen = false;
+
+    private List<CustomerSuggestion> customerSuggestions = new();
+
+    public class CustomerSuggestion
+    {
+        public int Id { get; set; }
+        public string Name { get; set; } = "";
+        public string Phone { get; set; } = "";
+    }
+
+    private async Task OnSearchInput(ChangeEventArgs e)
+    {
+        phoneInput = e.Value?.ToString() ?? "";
+        newName = "";
+
+        if (phoneInput.Length >= 2)
+        {
+            isSearching = true;
+            StateHasChanged();
+
+            try
+            {
+                // Використовуємо той самий розумний пошук, що і в звітах
+                customerSuggestions = await Http.GetFromJsonAsync<List<CustomerSuggestion>>($"api/reports/search-customers?query={Uri.EscapeDataString(phoneInput)}") ?? new();
+                isDropdownOpen = customerSuggestions.Any();
+            }
+            catch
+            {
+                customerSuggestions.Clear();
+                isDropdownOpen = false;
+            }
+            finally
+            {
+                isSearching = false;
+                StateHasChanged();
+            }
+        }
+        else
+        {
+            customerSuggestions.Clear();
+            isDropdownOpen = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task SelectExistingCustomer(CustomerSuggestion c)
+    {
+        phoneInput = c.Phone;
+        SelectedCustomer = new CustomerDto { Id = c.Id, Name = c.Name, Phone = c.Phone };
+
+        customerSuggestions.Clear();
+        isDropdownOpen = false;
+
+        await OnCustomerSelected.InvokeAsync(SelectedCustomer);
+        StateHasChanged();
+    }
+
+    private async Task CreateAndSelect()
+    {
+        if (string.IsNullOrWhiteSpace(newName) || string.IsNullOrWhiteSpace(phoneInput)) return;
+
+        var dto = new CustomerDto
+        {
+            Name = newName.Trim(),
+            Phone = phoneInput.Trim(),
+            Email = "" // Поле email тепер завжди пусте, як ви і просили
+        };
+
+        try
+        {
+            var response = await Http.PostAsJsonAsync("api/customers", dto);
+
+            if (response.IsSuccessStatusCode)
+            {
+                var created = await response.Content.ReadFromJsonAsync<CustomerDto>();
+
+                if (created != null)
+                {
+                    SelectedCustomer = created;
+                    await OnCustomerSelected.InvokeAsync(created);
+
+                    newName = "";
+                    customerSuggestions.Clear();
+                    isDropdownOpen = false;
+                    StateHasChanged();
+                }
+            }
+            else
+            {
+                var errorText = await response.Content.ReadAsStringAsync();
+                await JS.InvokeVoidAsync("alert", $"Помилка збереження: {errorText}");
+            }
+        }
+        catch (Exception ex)
+        {
+            await JS.InvokeVoidAsync("alert", $"Критична помилка збереження: {ex.Message}");
+        }
+    }
+
+    public void ClearCustomer()
+    {
+        SelectedCustomer = null;
+        phoneInput = "";
+        newName = "";
+        customerSuggestions.Clear();
+        isDropdownOpen = false;
+        OnCustomerSelected.InvokeAsync(null);
+    }
+
+    private void SkipCustomer()
+    {
+        SelectedCustomer = null;
+        OnCustomerSelected.InvokeAsync(null);
+    }
+
+    public async Task PreFillAsync(CustomerDto customer)
+    {
+        phoneInput = customer.Phone;
+        SelectedCustomer = customer;
+        await OnCustomerSelected.InvokeAsync(customer);
+        StateHasChanged();
+    }
+
+    public async Task PreFillManualAsync(string name, string phone)
+    {
+        phoneInput = phone;
+        SelectedCustomer = new CustomerDto { Name = name, Phone = phone };
+        await OnCustomerSelected.InvokeAsync(SelectedCustomer);
+        StateHasChanged();
+    }
+}

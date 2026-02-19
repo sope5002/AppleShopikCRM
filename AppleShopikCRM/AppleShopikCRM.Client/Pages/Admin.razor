@@ -5,5 +5,143 @@
 <h3>Адмін панель</h3>
 
 @code {
+    private string currentTab = "marketing";
+    private bool isLoading = true;
 
+    private string deliveryType = "all";
+    private decimal adExpensesUSD = 0;
+    private decimal otherExpenses = 0;
+    private int selectedStoreId = 0;
+    private string marketingSource = "Instagram";
+    private MarketingStatsDto marketingStats = new();
+
+    private decimal exchangeRate = 43.0m;
+    private decimal ExchangeRateSafe => exchangeRate > 0 ? exchangeRate : 1;
+
+    // 🔥 ЦІ ДВІ ЗМІННІ ВИКОРИСТОВУЮТЬСЯ ДЛЯ ФІЛЬТРУ МАРКЕТИНГУ
+    private DateTime startDate = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1);
+    private DateTime endDate = DateTime.Today;
+
+    private List<Store> stores = new();
+    private List<ProblemDeviceDto> problemDevices = new();
+    private List<ProblemRepairDto> problemRepairs = new();
+    private List<SupplierDto> masters = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAllData();
+    }
+
+    private async Task SetTab(string tab)
+    {
+        currentTab = tab;
+        await LoadAllData();
+    }
+
+    private async Task LoadAllData()
+    {
+        isLoading = true;
+        try
+        {
+            if (currentTab == "problems")
+                problemDevices = await Http.GetFromJsonAsync<List<ProblemDeviceDto>>("api/admin/missing-costs") ?? new();
+            else if (currentTab == "problems-rep")
+                problemRepairs = await Http.GetFromJsonAsync<List<ProblemRepairDto>>("api/admin/missing-repair-costs") ?? new();
+            else if (currentTab == "marketing")
+                await CalculateMarketing();
+
+            var allSuppliers = await Http.GetFromJsonAsync<List<SupplierDto>>("api/suppliers") ?? new();
+            masters = allSuppliers.Where(s => s.Notes != null && s.Notes.ToLower().Contains("ремонт")).ToList();
+
+            if (!stores.Any()) stores = await Http.GetFromJsonAsync<List<Store>>("api/transfers/stores") ?? new();
+        }
+        catch { }
+        isLoading = false;
+    }
+
+    private async Task LoadMarketingTab()
+    {
+        currentTab = "marketing";
+        await CalculateMarketing();
+    }
+
+    private async Task CalculateMarketing()
+    {
+        isLoading = true;
+        try
+        {
+            string query = $"?start={startDate:yyyy-MM-dd}&end={endDate:yyyy-MM-dd}&source={Uri.EscapeDataString(marketingSource)}&storeId={selectedStoreId}&deliveryType={deliveryType}&_={DateTime.Now.Ticks}";
+            var stats = await Http.GetFromJsonAsync<MarketingStatsDto>($"api/admin/marketing-stats{query}");
+
+            if (stats != null)
+            {
+                marketingStats = stats;
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex.Message);
+        }
+        isLoading = false;
+    }
+
+    private async Task LoadProblemsTab()
+    {
+        currentTab = "problems";
+        isLoading = true;
+        await LoadProblemDevices();
+        isLoading = false;
+    }
+
+    private async Task LoadProblemDevices()
+    {
+        try
+        {
+            problemDevices = await Http.GetFromJsonAsync<List<ProblemDeviceDto>>("api/admin/missing-costs") ?? new();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Помилка завантаження проблемних товарів: {ex.Message}");
+        }
+    }
+
+    private async Task SaveFixedCost(ProblemDeviceDto dev)
+    {
+        if (dev.TempPurchasePrice <= 0) return;
+        var res = await Http.PostAsJsonAsync("api/admin/fix-purchase-price", new { DeviceId = dev.Id, RealPurchasePrice = dev.TempPurchasePrice });
+        if (res.IsSuccessStatusCode) { problemDevices.Remove(dev); await JS.InvokeVoidAsync("alert", "✅ Борг постачальнику встановлено!"); }
+    }
+
+    private async Task LoadProblemRepairsTab()
+    {
+        currentTab = "problems-rep";
+        isLoading = true;
+        await LoadProblemRepairs();
+        isLoading = false;
+    }
+
+    private async Task LoadProblemRepairs()
+    {
+        try
+        {
+            problemRepairs = await Http.GetFromJsonAsync<List<ProblemRepairDto>>("api/admin/missing-repair-costs") ?? new();
+        }
+        catch { }
+    }
+
+    private async Task SaveFixedRepairCost(int ticketId, RepairItemDto item)
+    {
+        var res = await Http.PostAsJsonAsync("api/admin/fix-repair-item-cost", new { TicketId = ticketId, ItemId = item.Id, RealCostPart = item.TempCost, MasterId = item.MasterId });
+        if (res.IsSuccessStatusCode) { await LoadAllData(); await JS.InvokeVoidAsync("alert", "✅ Собівартість запчастини врахована!"); }
+    }
+
+    // DTO класи
+    public class ProblemDeviceDto { public int Id { get; set; } public string ModelName { get; set; } = ""; public string Identifier { get; set; } = ""; public bool IsSold { get; set; } public decimal TempPurchasePrice { get; set; } public decimal TempRepairCost { get; set; } public string? Color { get; set; } public string? Capacity { get; set; } }
+    public class ProblemRepairDto { public int Id { get; set; } public string TicketNumber { get; set; } = ""; public string DeviceModel { get; set; } = ""; public string Identifier { get; set; } = ""; public bool IsStockDevice { get; set; } public int StockDeviceIsSold { get; set; } public List<RepairItemDto> Items { get; set; } = new(); }
+    public class RepairItemDto { public int Id { get; set; } public string Name { get; set; } = ""; public decimal Price { get; set; } public decimal Cost { get; set; } public decimal TempCost { get; set; } public int MasterId { get; set; } }
+    public class SupplierDto { public int Id { get; set; } public string Name { get; set; } = ""; public string? Notes { get; set; } }
+    public class MarketingCategoryStats { public int Count { get; set; } public decimal RevenueUAH { get; set; } public decimal ProfitUSD { get; set; } }
+    public class MarketingSaleItemDto { public string ModelName { get; set; } = ""; public string Type { get; set; } = ""; public int Quantity { get; set; } public decimal RevenueUAH { get; set; } public decimal ProfitUSD { get; set; } public decimal WarrantyPriceUAH { get; set; } public decimal WarrantyProfitUSD { get; set; } }
+    public class MarketingSaleDto { public int SaleId { get; set; } public DateTime Date { get; set; } public decimal FinalAmount { get; set; } public decimal TotalProfitUSD { get; set; } public List<MarketingSaleItemDto> Items { get; set; } = new(); }
+    public class MarketingStatsDto { public int SalesCount { get; set; } public decimal TotalRevenueUAH { get; set; } public decimal TotalRevenueUSD { get; set; } public decimal TotalProfitUSD { get; set; } public MarketingCategoryStats Devices { get; set; } = new(); public MarketingCategoryStats Accessories { get; set; } = new(); public MarketingCategoryStats Repairs { get; set; } = new(); public MarketingCategoryStats Services { get; set; } = new(); public MarketingCategoryStats Warranties { get; set; } = new(); public List<MarketingSaleDto> SalesDetails { get; set; } = new(); }
 }

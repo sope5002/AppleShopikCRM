@@ -15,11 +15,11 @@ using AppleShopikCRM.Components;
 var builder = WebApplication.CreateBuilder(args);
 
 // 1. ПІДКЛЮЧЕННЯ БАЗИ ДАНИ
-    builder.Services.AddDbContext<ApplicationDbContext>(options =>
-        options.UseMySql(
-            builder.Configuration.GetConnectionString("DefaultConnection"),
+builder.Services.AddDbContext<ApplicationDbContext>(options =>
+options.UseMySql(
+    builder.Configuration.GetConnectionString("DefaultConnection"),
             ServerVersion.AutoDetect(builder.Configuration.GetConnectionString("DefaultConnection"))
-        ));
+));
 
 
 // 2. IDENTITY
@@ -109,6 +109,10 @@ builder.Services.AddControllersWithViews()
 builder.Services.AddScoped<AppleShopikCRM.Server.Services.PdfService>();
 builder.Services.AddScoped<AppleShopikCRM.Server.Services.StorageService>();
 
+builder.Services.AddHttpClient<TelegramService>();
+builder.Services.AddSignalR();
+builder.Environment.EnvironmentName = "Development";
+
 var app = builder.Build();
 
 // --- HTTP PIPELINE ---
@@ -132,7 +136,8 @@ app.UseAntiforgery(); // Важливо для .NET 8
 // 6. АВТОРИЗАЦІЯ
 app.UseAuthentication();
 app.UseAuthorization();
-
+ 
+app.MapHub<AppleShopikCRM.Hubs.ChatHub>("/chathub"); // Додати цей рядок
 // 7. МАРШРУТИЗАЦІЯ
 app.MapControllers(); // Вмикає API (api/sales, api/auth)
 

@@ -1,0 +1,1495 @@
+﻿@page "/admin/employees"
+@using AppleShopikCRM.Client.Models
+@using Microsoft.AspNetCore.Components.Web
+@using System.Net.Http.Json
+@inject HttpClient Http
+@inject IJSRuntime JS
+@rendermode InteractiveWebAssembly
+
+<PageTitle>Працівники та ЗП — Apple Shopik</PageTitle>
+
+<style>
+    /* Базові стилі */
+    :root {
+        --apple-blue: #0071e3;
+        --apple-blue-h: #0077ed;
+        --apple-green: #34c759;
+        --apple-red: #ff3b30;
+        --apple-gray: #f5f5f7;
+        --apple-border: #d2d2d7;
+        --apple-text: #1d1d1f;
+        --apple-sub: #6e6e73;
+        --radius-lg: 16px;
+        --radius-md: 10px;
+        --shadow-card: 0 4px 16px rgba(0,0,0,.05);
+    }
+
+    .admin-root {
+        padding: 24px;
+        background: var(--apple-gray);
+        min-height: 100vh;
+        font-family: -apple-system, sans-serif;
+        color: var(--apple-text);
+    }
+
+    .admin-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 24px;
+        flex-wrap: wrap;
+        gap: 16px;
+    }
+
+    .page-title {
+        font-size: 1.5rem;
+        font-weight: 700;
+        margin: 0;
+    }
+
+    .filter-bar {
+        background: #fff;
+        padding: 8px 16px;
+        border-radius: var(--radius-md);
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        box-shadow: 0 1px 3px rgba(0,0,0,.04);
+        border: 1px solid var(--apple-border);
+    }
+
+    .apple-input {
+        border: 1px solid var(--apple-border);
+        border-radius: 8px;
+        padding: 8px 12px;
+        font-size: 14px;
+        outline: none;
+        transition: border-color 0.15s;
+        width: 100%;
+    }
+
+        .apple-input:focus {
+            border-color: var(--apple-blue);
+            box-shadow: 0 0 0 3px rgba(0,113,227,.1);
+        }
+
+    .segment-control {
+        display: flex;
+        background: #e9e9eb;
+        border-radius: 10px;
+        padding: 4px;
+        gap: 4px;
+        margin-bottom: 20px;
+        width: fit-content;
+        flex-wrap: wrap;
+    }
+
+    .segment-btn {
+        border: none;
+        background: transparent;
+        border-radius: 8px;
+        padding: 8px 20px;
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--apple-sub);
+        cursor: pointer;
+        transition: all 0.2s;
+        position: relative;
+    }
+
+        .segment-btn.active {
+            background: #fff;
+            color: var(--apple-text);
+            box-shadow: 0 2px 6px rgba(0,0,0,.1);
+        }
+
+    .btn-apple {
+        border: none;
+        border-radius: 8px;
+        padding: 8px 16px;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        transition: 0.15s;
+    }
+
+        .btn-apple.primary {
+            background: var(--apple-blue);
+            color: #fff;
+        }
+
+            .btn-apple.primary:hover {
+                background: var(--apple-blue-h);
+            }
+
+        .btn-apple.outline {
+            background: transparent;
+            border: 1.5px solid var(--apple-border);
+            color: var(--apple-text);
+        }
+
+        .btn-apple.success {
+            background: var(--apple-green);
+            color: #fff;
+        }
+
+    .apple-card {
+        background: #fff;
+        border-radius: var(--radius-lg);
+        box-shadow: var(--shadow-card);
+        overflow: hidden;
+        border: 1px solid var(--apple-border);
+    }
+
+    .apple-table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+        .apple-table th {
+            padding: 14px 20px;
+            font-size: 12px;
+            color: var(--apple-sub);
+            text-transform: uppercase;
+            border-bottom: 1px solid var(--apple-border);
+            text-align: left;
+            background: #fafafa;
+        }
+
+        .apple-table td {
+            padding: 14px 20px;
+            font-size: 14px;
+            border-bottom: 1px solid #f0f0f0;
+            vertical-align: middle;
+        }
+
+    .modal-backdrop-apple {
+        position: fixed;
+        inset: 0;
+        background: rgba(0,0,0,.45);
+        backdrop-filter: blur(4px);
+        z-index: 1050;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 16px;
+    }
+
+    .modal-sheet {
+        background: #fff;
+        border-radius: 18px;
+        width: 100%;
+        max-width: 450px;
+        box-shadow: 0 20px 60px rgba(0,0,0,.2);
+        display: flex;
+        flex-direction: column;
+    }
+
+        .modal-sheet.lg {
+            max-width: 800px;
+        }
+
+    .ms-header {
+        padding: 18px 20px 14px;
+        border-bottom: 1px solid var(--apple-border);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .ms-body {
+        padding: 20px;
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+        max-height: 70vh;
+        overflow-y: auto;
+    }
+
+    .ms-footer {
+        padding: 14px 20px;
+        border-top: 1px solid var(--apple-border);
+        display: flex;
+        justify-content: flex-end;
+        gap: 10px;
+        background: #fafafa;
+        border-radius: 0 0 18px 18px;
+    }
+
+    .apple-label {
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--apple-sub);
+        margin-bottom: -8px;
+    }
+
+    .kpi-cat-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 6px 10px;
+        background: #fdfdfd;
+        border: 1px solid var(--apple-border);
+        border-radius: 8px;
+        margin-bottom: 6px;
+    }
+
+    .kpi-cat-name {
+        font-size: 12px;
+        font-weight: 600;
+        width: 110px;
+    }
+
+    .kpi-cat-val {
+        font-size: 13px;
+        font-weight: 700;
+    }
+
+    .kpi-cat-prof {
+        font-size: 13px;
+        font-weight: 700;
+        color: #1a7a35;
+        width: 60px;
+        text-align: right;
+    }
+
+    .kpi-category-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 12px 16px;
+        background: #f5f5f7;
+        border: 1px solid var(--apple-border);
+        border-radius: 10px;
+        cursor: pointer;
+        user-select: none;
+        margin-bottom: 6px;
+        transition: background 0.2s;
+    }
+
+        .kpi-category-header:hover {
+            background: #e9e9eb;
+        }
+
+    .kpi-category-content {
+        padding: 0 4px 12px 4px;
+        animation: fadeIn 0.2s ease-in-out;
+    }
+
+    @@keyframes fadeIn {
+        from {
+            opacity: 0;
+            transform: translateY(-4px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    /* 🔥 СТИЛІ ДЛЯ ДРУКУ PDF */
+    @@media print {
+        .sidebar, nav, aside, header, .top-row, .menu, .navbar {
+            display: none !important;
+        }
+
+        .main, .page, main, #app {
+            margin: 0 !important;
+            padding: 0 !important;
+            width: 100% !important;
+            display: block !important;
+        }
+
+        .no-print {
+            display: none !important;
+        }
+
+        body, html, .admin-root {
+            background: #fff !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            height: auto !important;
+        }
+
+        .print-container {
+            display: block !important;
+            width: 100% !important;
+        }
+
+        #printable-timesheet {
+            box-shadow: none !important;
+            border: none !important;
+            width: 100% !important;
+            max-width: 100% !important;
+            padding: 10px !important;
+            margin: 0 !important;
+            color: #000 !important;
+        }
+    }
+</style>
+
+<div class="admin-root">
+    <div class="admin-header no-print">
+        <h1 class="page-title"><i class="bi bi-people-fill me-2" style="color:var(--apple-blue);"></i>Команда</h1>
+
+        @if (currentTab == "shifts" || currentTab == "kpi")
+        {
+            <div class="filter-bar">
+                <i class="bi bi-calendar3 text-muted"></i>
+                <input type="date" class="apple-input" style="border:none; padding:0;" @bind="startDate" @bind:format="yyyy-MM-dd" />
+                <span class="text-muted">—</span>
+                <input type="date" class="apple-input" style="border:none; padding:0;" @bind="endDate" @bind:format="yyyy-MM-dd" />
+                <button class="btn-apple outline ms-2" @onclick="LoadTabData"><i class="bi bi-arrow-clockwise"></i></button>
+            </div>
+        }
+        @if (currentTab == "payroll")
+        {
+            <div class="filter-bar">
+                <i class="bi bi-calendar-month text-muted"></i>
+                <input type="month" class="apple-input" style="border:none; padding:0; font-weight: 600;" @bind="payrollMonthYear" @bind:format="yyyy-MM" />
+                <button class="btn-apple outline ms-2" @onclick="LoadTabData"><i class="bi bi-arrow-clockwise"></i></button>
+            </div>
+        }
+    </div>
+
+    <div class="no-print" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+        <div class="segment-control">
+            <button class="segment-btn @(currentTab == "users" ? "active" : "")" @onclick="@(() => SwitchTab("users"))">
+                <i class="bi bi-person-badge me-1"></i> Працівники
+            </button>
+            <button class="segment-btn @(currentTab == "rules" ? "active" : "")" @onclick="@(() => SwitchTab("rules"))">
+                <i class="bi bi-gear-fill me-1"></i> Правила ЗП
+            </button>
+            <button class="segment-btn @(currentTab == "shifts" ? "active" : "")" @onclick="@(() => SwitchTab("shifts"))">
+                <i class="bi bi-clock-history me-1"></i> Робочі Зміни
+            </button>
+            <button class="segment-btn @(currentTab == "kpi" ? "active" : "")" @onclick="@(() => SwitchTab("kpi"))">
+                <i class="bi bi-graph-up-arrow me-1"></i> KPI (Продажі)
+            </button>
+            <button class="segment-btn @(currentTab == "payroll" ? "active" : "")" @onclick="@(() => SwitchTab("payroll"))">
+                <i class="bi bi-cash-coin me-1" style="color: var(--apple-green);"></i> Зарплата
+            </button>
+            <button class="segment-btn @(currentTab == "timesheet-pdf" ? "active" : "")" @onclick="@(() => SwitchTab("timesheet-pdf"))">
+                <i class="bi bi-filetype-pdf me-1" style="color: var(--apple-red);"></i> Табель PDF
+            </button>
+        </div>
+
+        @if (currentTab == "users")
+        {
+            <div class="d-flex gap-2 mb-3">
+                <button class="btn-apple primary" @onclick="() => showUserModal = true">
+                    <i class="bi bi-person-plus-fill"></i> Новий працівник
+                </button>
+                <button class="btn-apple outline @(showBlockedUsers ? "active" : "")" @onclick="() => showBlockedUsers = !showBlockedUsers">
+                    <i class="bi bi-person-x-fill"></i> @(showBlockedUsers ? "Показати активних" : "Заблоковані працівники")
+                </button>
+            </div>
+        }
+    </div>
+
+    @if (isLoading)
+    {
+        <div class="text-center py-5 text-muted no-print"><div class="spinner-border"></div></div>
+    }
+    else
+    {
+        @if (currentTab == "users")
+        {
+            <div class="apple-card no-print">
+                <table class="apple-table">
+                    <thead>
+                        <tr>
+                            <th>ПІБ</th>
+                            <th>Email (Логін)</th>
+                            <th>Магазин</th>
+                            <th>Роль</th>
+                            <th style="text-align: right;">Дії</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (!usersList.Where(u => u.IsBlocked == showBlockedUsers).Any())
+                        {
+                            <tr><td colspan="5" class="text-center py-4 text-muted">Список порожній</td></tr>
+                        }
+                        @foreach (var u in usersList.Where(u => u.IsBlocked == showBlockedUsers))
+                        {
+                            <tr style="@(u.IsBlocked ? "opacity: 0.6; background: #fafafa;" : "")">
+                                <td style="font-weight:600;">@u.FullName</td>
+                                <td>@u.Email</td>
+                                <td><span class="badge bg-secondary bg-opacity-10 text-dark">@u.StoreName</span></td>
+                                <td>
+                                    @if (u.Role == "Admin")
+                                    {
+                                        <span class="badge bg-danger">Адмін</span>
+                                    }
+                                    else if (u.Role == "Technician")
+                                    {
+
+                                        <span class="badge bg-info text-dark">Майстер</span>
+                                    }
+                                    else
+                                    {
+
+                                        <span class="badge bg-primary">Менеджер</span>
+                                    }
+                                </td>
+                                <td style="text-align: right; white-space: nowrap;">
+                                    @if (!u.IsBlocked)
+                                    {
+                                        <button class="btn-apple outline me-2" style="padding: 4px 10px; font-size: 12px;" @onclick="() => OpenEditUserModal(u)"><i class="bi bi-pencil-square"></i></button>
+                                        <button class="btn-apple outline" style="padding: 4px 10px; font-size: 12px; color: var(--apple-red); border-color: var(--apple-red);" title="Заблокувати" @onclick="() => BlockUser(u.Id, u.FullName)"><i class="bi bi-lock-fill"></i></button>
+                                    }
+                                    else
+                                    {
+                                        <button class="btn-apple outline" style="padding: 4px 10px; font-size: 12px; color: var(--apple-green); border-color: var(--apple-green);" title="Розблокувати" @onclick="() => UnblockUser(u.Id, u.FullName)"><i class="bi bi-unlock-fill"></i> Відновити</button>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+
+        else if (currentTab == "rules")
+        {
+            <div class="apple-card no-print">
+                <div class="table-responsive">
+                    <table class="apple-table align-middle">
+                        <thead class="table-dark text-center">
+                            <tr>
+                                <th style="min-width: 150px;">Працівник</th>
+                                <th>Ставка (грн)</th>
+                                <th>Штраф (грн)</th>
+                                <th>Бонус Техніка (грн)</th>
+                                <th>Бонус Гарантія (грн)</th>
+                                <th>Аксесуари (%)</th>
+                                <th>Послуги (%)</th>
+                                <th>Дія</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var rule in salaryRules)
+                            {
+                                <tr>
+                                    <td class="fw-bold">
+                                        @rule.EmployeeName <br />
+                                        <span class="badge bg-secondary" style="font-size: 10px;">@rule.StoreName</span>
+                                    </td>
+                                    <td><input type="number" step="100" class="apple-input text-center" style="padding: 4px;" @bind="rule.MonthlyBaseSalary" /></td>
+                                    <td><input type="number" step="10" class="apple-input text-center" style="padding: 4px;" @bind="rule.PenaltyPerLateness" /></td>
+                                    <td><input type="number" step="10" class="apple-input text-center" style="padding: 4px;" @bind="rule.BonusPerDevice" /></td>
+                                    <td><input type="number" step="10" class="apple-input text-center" style="padding: 4px;" @bind="rule.BonusPerWarranty" /></td>
+                                    <td><input type="number" step="0.1" class="apple-input text-center" style="padding: 4px;" @bind="rule.AccessoryBonusPercent" /></td>
+                                    <td><input type="number" step="0.1" class="apple-input text-center" style="padding: 4px;" @bind="rule.ServiceBonusPercent" /></td>
+                                    <td class="text-center">
+                                        <button class="btn-apple success" style="padding: 6px 12px; width: 100%;" @onclick="() => SaveRule(rule)">Зберегти</button>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        }
+
+        else if (currentTab == "shifts")
+        {
+            <div class="apple-card no-print">
+                <table class="apple-table">
+                    <thead>
+                        <tr>
+                            <th>Працівник</th>
+                            <th>Магазин</th>
+                            <th>Дата</th>
+                            <th>Відкриття</th>
+                            <th>Закриття</th>
+                            <th>Відпрацьовано</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (!shifts.Any())
+                        {
+                            <tr><td colspan="6" class="text-center py-4 text-muted">Немає змін за цей період</td></tr>
+                        }
+                        @foreach (var s in shifts)
+                        {
+                            <tr>
+                                <td style="font-weight:600;">@s.UserName</td>
+                                <td><span class="badge bg-secondary bg-opacity-10 text-dark">@s.StoreName</span></td>
+                                <td>@s.WorkDate.ToString("dd.MM.yyyy")</td>
+                                <td style="color:var(--apple-green); font-weight:600;">@(s.ClockInTime?.ToString("HH:mm") ?? "—")</td>
+                                <td style="color:var(--apple-red); font-weight:600;">@(s.ClockOutTime?.ToString("HH:mm") ?? "В роботі")</td>
+                                <td>
+                                    @if (s.ClockInTime.HasValue && s.ClockOutTime.HasValue)
+                                    {
+                                        var span = s.ClockOutTime.Value - s.ClockInTime.Value;
+                                        <span>@Math.Floor(span.TotalHours) год @span.Minutes хв</span>
+                                    }
+                                    else
+                                    {
+                                        <span>—</span>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+
+        else if (currentTab == "kpi")
+        {
+            <div class="apple-card no-print">
+                <table class="apple-table">
+                    <thead>
+                        <tr>
+                            <th>Менеджер</th>
+                            <th>Продажі (Деталізація)</th>
+                            <th>Загальна Каса</th>
+                            <th>Загальний Прибуток</th>
+                            <th style="text-align: right;">Дії</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (!kpis.Any())
+                        {
+                            <tr><td colspan="5" class="text-center py-4 text-muted">Немає продажів за цей період</td></tr>
+                        }
+                        @foreach (var k in kpis.OrderByDescending(x => x.TotalProfitUSD))
+                        {
+                            <tr>
+                                <td style="font-weight:600; font-size: 1.1rem; vertical-align: top; padding-top: 16px;">
+                                    @k.UserName
+                                    <div style="font-size: 12px; color: var(--apple-sub); font-weight: normal; margin-top: 4px;">Всього: @k.ItemsSold шт.</div>
+                                </td>
+                                <td style="padding-top: 12px;">
+                                    @if (k.Devices.Count > 0)
+                                    {
+                                        <div class="kpi-cat-row"><span class="kpi-cat-name" style="color: var(--apple-blue);"><i class="bi bi-phone"></i> Техніка (@k.Devices.Count)</span><span class="kpi-cat-val">@k.Devices.RevenueUAH.ToString("N0") ₴</span><span class="kpi-cat-prof">+$@k.Devices.ProfitUSD.ToString("N0")</span></div>
+                                    }
+                                    @if (k.Accessories.Count > 0)
+                                    {
+                                        <div class="kpi-cat-row"><span class="kpi-cat-name" style="color: #e68600;"><i class="bi bi-headphones"></i> Аксесуари (@k.Accessories.Count)</span><span class="kpi-cat-val">@k.Accessories.RevenueUAH.ToString("N0") ₴</span><span class="kpi-cat-prof">+$@k.Accessories.ProfitUSD.ToString("N0")</span></div>
+                                    }
+                                    @if (k.Repairs.Count > 0)
+                                    {
+                                        <div class="kpi-cat-row"><span class="kpi-cat-name" style="color: var(--apple-red);"><i class="bi bi-tools"></i> Ремонти (@k.Repairs.Count)</span><span class="kpi-cat-val">@k.Repairs.RevenueUAH.ToString("N0") ₴</span><span class="kpi-cat-prof">+$@k.Repairs.ProfitUSD.ToString("N0")</span></div>
+                                    }
+                                    @if (k.Services.Count > 0)
+                                    {
+                                        <div class="kpi-cat-row"><span class="kpi-cat-name" style="color: #1a7a35;"><i class="bi bi-stars"></i> Послуги (@k.Services.Count)</span><span class="kpi-cat-val">@k.Services.RevenueUAH.ToString("N0") ₴</span><span class="kpi-cat-prof">+$@k.Services.ProfitUSD.ToString("N0")</span></div>
+                                    }
+                                    @if (k.Warranties.Count > 0)
+                                    {
+                                        <div class="kpi-cat-row"><span class="kpi-cat-name" style="color: #5856d6;"><i class="bi bi-shield-check"></i> Гарантії (@k.Warranties.Count)</span><span class="kpi-cat-val">@k.Warranties.RevenueUAH.ToString("N0") ₴</span><span class="kpi-cat-prof">+$@k.Warranties.ProfitUSD.ToString("N0")</span></div>
+                                    }
+                                </td>
+                                <td style="font-weight:700; color:var(--apple-text); vertical-align: top; padding-top: 16px; font-size: 1.1rem;">@k.TotalRevenueUAH.ToString("N0") ₴</td>
+                                <td style="font-weight:800; color:var(--apple-green); font-size:1.3rem; vertical-align: top; padding-top: 16px;">+$@k.TotalProfitUSD.ToString("N0")</td>
+                                <td style="vertical-align: top; padding-top: 16px; text-align: right;"><button class="btn-apple outline" style="padding: 6px 12px; font-size: 12px;" @onclick="() => OpenKpiDetails(k)">Деталі</button></td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+
+        else if (currentTab == "payroll")
+        {
+            <div class="no-print" style="display: grid; grid-template-columns: 300px 1fr; gap: 20px;">
+                <div class="apple-card" style="padding: 0; max-height: 70vh; overflow-y: auto;">
+                    <div style="padding: 16px; background: #fafafa; border-bottom: 1px solid var(--apple-border); position: sticky; top: 0;">
+                        <h6 style="margin: 0; font-weight: 700; color: var(--apple-sub);">СПИСОК ДО ОПЛАТИ</h6>
+                    </div>
+                    @if (!payrolls.Any())
+                    {
+                        <div class="text-center py-4 text-muted" style="font-size: 13px;">Немає розрахунків</div>
+                    }
+                    @foreach (var p in payrolls)
+                    {
+                        <div style="padding: 12px 16px; border-bottom: 1px solid #f0f0f0; cursor: pointer; background: @(selectedPayroll == p ? "rgba(0,113,227,0.05)" : "#fff"); border-left: @(selectedPayroll == p ? "4px solid var(--apple-blue)" : "4px solid transparent");"
+                             @onclick="() => SelectPayroll(p)">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                                <span style="font-weight: 600; font-size: 15px; color: var(--apple-text);">@p.EmployeeName</span>
+                                @if (p.IsSaved)
+                                {
+                                    <i class="bi bi-check-circle-fill text-success" title="Збережено"></i>
+                                }
+                            </div>
+                            <div style="font-size: 11px; color: var(--apple-sub); margin-bottom: 6px;">@p.StoreName</div>
+                            <div style="display: flex; justify-content: space-between; align-items: center; font-size: 13px;">
+                                <span class="text-muted">Нараховано:</span>
+                                <span style="font-weight: 600;">@p.BaseSalaryCalculated.ToString("N0") ₴</span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; align-items: center; font-size: 13px; color: var(--apple-blue); font-weight: 700; margin-top: 2px;">
+                                <span>До виплати:</span>
+                                <span>@p.FinalPayout.ToString("N0") ₴</span>
+                            </div>
+                        </div>
+                    }
+                </div>
+
+                <div class="apple-card" style="padding: 24px;">
+                    @if (selectedPayroll == null)
+                    {
+                        <div class="text-center py-5 text-muted" style="height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center;">
+                            <i class="bi bi-calculator" style="font-size: 3rem; color: #d2d2d7;"></i>
+                            <h5 class="mt-3">Оберіть працівника</h5>
+                            <p>Щоб побачити деталізацію ЗП або відредагувати її.</p>
+                        </div>
+                    }
+                    else
+                    {
+                        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 24px;">
+                            <div>
+                                <h3 style="margin: 0; font-weight: 700;">@selectedPayroll.EmployeeName</h3>
+                                <span class="badge bg-secondary bg-opacity-10 text-dark mt-2">@selectedPayroll.StoreName</span>
+                                @if (selectedPayroll.IsSaved)
+                                {
+                                    <span class="badge bg-success ms-2">Збережено в БД</span>
+                                }
+                            </div>
+                            <div style="text-align: right;">
+                                <div style="font-size: 12px; color: var(--apple-sub); text-transform: uppercase; font-weight: 700;">До виплати</div>
+                                <div style="font-size: 32px; font-weight: 800; color: var(--apple-blue); line-height: 1;">
+                                    <span style="white-space: nowrap;">@selectedPayroll.FinalPayout.ToString("N0") ₴</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
+                            <div style="background: var(--apple-gray); padding: 16px; border-radius: 14px; border: 1px solid var(--apple-border);">
+                                <h6 style="font-weight: 700; color: var(--apple-sub); margin-bottom: 16px;"><i class="bi bi-clipboard-data me-2"></i>Фактичні показники</h6>
+                                <div style="display: flex; flex-direction: column; gap: 12px;">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <span style="font-size: 14px; font-weight: 600;">Відпрацьовано днів</span>
+                                        <input type="number" class="apple-input text-center" style="width: 80px; padding: 4px;" @bind="selectedPayroll.WorkingDays" @bind:event="oninput" @onkeyup="RecalculateSelected" />
+                                    </div>
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <span style="font-size: 14px; font-weight: 600; color: var(--apple-red);">Кількість запізнень</span>
+                                        <input type="number" class="apple-input text-center" style="width: 80px; padding: 4px;" @bind="selectedPayroll.Latenesses" @bind:event="oninput" @onkeyup="RecalculateSelected" />
+                                    </div>
+                                    <hr style="margin: 4px 0; border-color: var(--apple-border);" />
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <span style="font-size: 14px;">Техніка (шт)</span>
+                                        <input type="number" class="apple-input text-center" style="width: 80px; padding: 4px;" @bind="selectedPayroll.DevicesSold" @bind:event="oninput" @onkeyup="RecalculateSelected" />
+                                    </div>
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <span style="font-size: 14px;">Гарантії (шт)</span>
+                                        <input type="number" class="apple-input text-center" style="width: 80px; padding: 4px;" @bind="selectedPayroll.WarrantiesSold" @bind:event="oninput" @onkeyup="RecalculateSelected" />
+                                    </div>
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <span style="font-size: 14px;">Аксесуари (каса ₴)</span>
+                                        <input type="number" class="apple-input text-center" style="width: 100px; padding: 4px;" @bind="selectedPayroll.AccessoriesRevenueUAH" @bind:event="oninput" @onkeyup="RecalculateSelected" />
+                                    </div>
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <span style="font-size: 14px;">Послуги (каса ₴)</span>
+                                        <input type="number" class="apple-input text-center" style="width: 100px; padding: 4px;" @bind="selectedPayroll.ServicesRevenueUAH" @bind:event="oninput" @onkeyup="RecalculateSelected" />
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div style="background: #fff; padding: 16px; border-radius: 14px; border: 1px solid var(--apple-border); box-shadow: 0 2px 8px rgba(0,0,0,.02);">
+                                <h6 style="font-weight: 700; color: var(--apple-sub); margin-bottom: 16px;"><i class="bi bi-cash-stack me-2"></i>Нарахування (Грн)</h6>
+                                <div style="display: flex; flex-direction: column; gap: 8px;">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <span style="font-size: 13px;" title="Ставка / 22 дні * Відпрацьовано">Ставка (@selectedPayroll.RuleMonthlyRate)</span>
+                                        <input type="number" class="form-control form-control-sm text-end fw-bold" style="width: 100px;" @bind="selectedPayroll.BaseSalaryAmount" @bind:event="oninput" @onkeyup="RecalculateTotalsOnly" />
+                                    </div>
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <span style="font-size: 13px;">Техніка (+@selectedPayroll.RuleDeviceBonus/шт)</span>
+                                        <input type="number" class="form-control form-control-sm text-end fw-bold text-success" style="width: 100px;" @bind="selectedPayroll.DevicesBonusAmount" @bind:event="oninput" @onkeyup="RecalculateTotalsOnly" />
+                                    </div>
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <span style="font-size: 13px;">Гарантії (+@selectedPayroll.RuleWarrantyBonus/шт)</span>
+                                        <input type="number" class="form-control form-control-sm text-end fw-bold text-success" style="width: 100px;" @bind="selectedPayroll.WarrantiesBonusAmount" @bind:event="oninput" @onkeyup="RecalculateTotalsOnly" />
+                                    </div>
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <span style="font-size: 13px;">Аксесуари (@selectedPayroll.RuleAccPercent%)</span>
+                                        <input type="number" class="form-control form-control-sm text-end fw-bold text-success" style="width: 100px;" @bind="selectedPayroll.AccessoriesBonusAmount" @bind:event="oninput" @onkeyup="RecalculateTotalsOnly" />
+                                    </div>
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <span style="font-size: 13px;">Послуги (@selectedPayroll.RuleSrvPercent%)</span>
+                                        <input type="number" class="form-control form-control-sm text-end fw-bold text-success" style="width: 100px;" @bind="selectedPayroll.ServicesBonusAmount" @bind:event="oninput" @onkeyup="RecalculateTotalsOnly" />
+                                    </div>
+                                    <div class="d-flex justify-content-between align-items-center mt-1">
+                                        <span style="font-size: 13px; font-weight: 600; color: var(--apple-red);">Штраф (-@selectedPayroll.RulePenalty/шт)</span>
+                                        <input type="number" class="form-control form-control-sm text-end fw-bold text-danger" style="width: 100px;" @bind="selectedPayroll.LatenessPenaltyAmount" @bind:event="oninput" @onkeyup="RecalculateTotalsOnly" />
+                                    </div>
+                                </div>
+
+                                <hr style="border-color: var(--apple-border);" />
+
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <span style="font-size: 14px; font-weight: 700;">Всього нараховано:</span>
+                                    <span style="font-size: 16px; font-weight: 800; white-space: nowrap;">@selectedPayroll.BaseSalaryCalculated.ToString("N0") ₴</span>
+                                </div>
+
+                                <div class="d-flex justify-content-between align-items-center bg-light p-2 rounded">
+                                    <span style="font-size: 14px; font-weight: 700; color: #ff9500;">Аванс (видано):</span>
+                                    <input type="number" class="form-control form-control-sm text-end fw-bold" style="width: 100px; border-color: #ff9500; color: #ff9500;" @bind="selectedPayroll.AdvancePayment" @bind:event="oninput" @onkeyup="RecalculateTotalsOnly" />
+                                </div>
+                            </div>
+                        </div>
+
+                        <div style="margin-top: 24px; text-align: right;">
+                            <button class="btn-apple primary" style="padding: 12px 32px; font-size: 16px;" @onclick="SaveSinglePayrollRecord">
+                                <i class="bi bi-check-circle me-2"></i> Зберегти та зафіксувати
+                            </button>
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+
+        @* 🔥 ВКЛАДКА: ГЕНЕРАТОР ТАБЕЛЯ + АРХІВ *@
+        else if (currentTab == "timesheet-pdf")
+        {
+            <div class="d-flex justify-content-between align-items-center mb-3 no-print">
+                <h4 class="m-0" style="font-weight: 700;">Генератор Табелів</h4>
+                <div class="segment-control m-0">
+                    <button class="segment-btn @(!isArchiveView ? "active" : "")" @onclick="() => isArchiveView = false">
+                        <i class="bi bi-pencil-square me-1"></i> Створити новий
+                    </button>
+                    <button class="segment-btn @(isArchiveView ? "active" : "")" @onclick="LoadArchives">
+                        <i class="bi bi-archive-fill me-1"></i> Архів збережених
+                    </button>
+                </div>
+            </div>
+
+            @if (!isArchiveView)
+            {
+                <div style="display: grid; grid-template-columns: 350px 1fr; gap: 24px; align-items: start;">
+                    @* ЛІВА ПАНЕЛЬ: РЕДАКТОР ДАНИХ (НЕ ДРУКУЄТЬСЯ) *@
+                    <div class="apple-card no-print" style="padding: 20px;">
+                        <div style="display: flex; flex-direction: column; gap: 12px;">
+                            <div>
+                                <label class="apple-label">Прізвище, Ім'я працівника</label>
+                                <input type="text" class="apple-input mt-1" @bind="tsForm.FullName" @bind:event="oninput" placeholder="Іванов Іван" />
+                            </div>
+                            <div>
+                                <label class="apple-label">Місяць та рік</label>
+                                <input type="text" class="apple-input mt-1" @bind="tsForm.Month" @bind:event="oninput" placeholder="Березень 2026" />
+                            </div>
+
+                            <hr style="margin: 8px 0; border-color: var(--apple-border);" />
+                            <label class="apple-label" style="color: var(--apple-blue);">ФАКТИЧНІ ПОКАЗНИКИ</label>
+
+                            <div class="d-flex gap-2">
+                                <div style="flex: 1;"><label class="apple-label">Роб. днів</label><input type="number" class="apple-input mt-1" @bind="tsForm.WorkingDays" @bind:event="oninput" /></div>
+                                <div style="flex: 1;"><label class="apple-label">Запізнень</label><input type="number" class="apple-input mt-1" @bind="tsForm.Latenesses" @bind:event="oninput" /></div>
+                            </div>
+
+                            <div class="d-flex gap-2">
+                                <div style="flex: 1;"><label class="apple-label">iPhone (шт)</label><input type="number" class="apple-input mt-1" @bind="tsForm.IphonesSold" @bind:event="oninput" /></div>
+                                <div style="flex: 1;"><label class="apple-label">iPad/Watch (шт)</label><input type="number" class="apple-input mt-1" @bind="tsForm.OtherAppleSold" @bind:event="oninput" /></div>
+                            </div>
+
+                            <div class="d-flex gap-2">
+                                <div style="flex: 1;"><label class="apple-label">Гарантії (шт)</label><input type="number" class="apple-input mt-1" @bind="tsForm.WarrantiesSold" @bind:event="oninput" /></div>
+                                <div style="flex: 1;"><label class="apple-label">Акс. (каса ₴)</label><input type="number" class="apple-input mt-1" @bind="tsForm.AccessoriesRevenueUAH" @bind:event="oninput" /></div>
+                            </div>
+
+                            <div class="d-flex gap-2">
+                                <div style="flex: 1;"><label class="apple-label">Послуги (шт)</label><input type="number" class="apple-input mt-1" @bind="tsForm.ServicesSold" @bind:event="oninput" /></div>
+                                <div style="flex: 1;"></div>
+                            </div>
+
+                            <hr style="margin: 8px 0; border-color: var(--apple-border);" />
+                            <label class="apple-label" style="color: var(--apple-green);">НАРАХУВАННЯ (ГРН)</label>
+
+                            <div>
+                                <label class="apple-label">Ставка (за дні)</label>
+                                <input type="number" class="apple-input mt-1 fw-bold text-success" @bind="tsForm.BaseSalaryAmount" @bind:event="oninput" />
+                            </div>
+
+                            <div class="d-flex gap-2">
+                                <div style="flex: 1;"><label class="apple-label">Бонус iPhone</label><input type="number" class="apple-input mt-1" @bind="tsForm.IphonesBonusAmount" @bind:event="oninput" /></div>
+                                <div style="flex: 1;"><label class="apple-label">Бонус iPad/W</label><input type="number" class="apple-input mt-1" @bind="tsForm.OtherAppleBonusAmount" @bind:event="oninput" /></div>
+                            </div>
+
+                            <div class="d-flex gap-2">
+                                <div style="flex: 1;"><label class="apple-label">За гарантії</label><input type="number" class="apple-input mt-1" @bind="tsForm.WarrantiesBonusAmount" @bind:event="oninput" /></div>
+                                <div style="flex: 1;"><label class="apple-label">За аксесуари</label><input type="number" class="apple-input mt-1" @bind="tsForm.AccessoriesBonusAmount" @bind:event="oninput" /></div>
+                            </div>
+
+                            <div class="d-flex gap-2">
+                                <div style="flex: 1;"><label class="apple-label">За послуги</label><input type="number" class="apple-input mt-1" @bind="tsForm.ServicesBonusAmount" @bind:event="oninput" /></div>
+                                <div style="flex: 1;"><label class="apple-label" style="color: var(--apple-blue);">Премія</label><input type="number" class="apple-input mt-1 fw-bold text-primary" @bind="tsForm.BonusAmount" @bind:event="oninput" /></div>
+                            </div>
+
+                            <div class="d-flex gap-2">
+                                <div style="flex: 1;"><label class="apple-label" style="color: var(--apple-red);">Штрафи</label><input type="number" class="apple-input mt-1 text-danger" @bind="tsForm.PenaltyAmount" @bind:event="oninput" /></div>
+                                <div style="flex: 1;"><label class="apple-label" style="color: #ff9500;">Виданий Аванс</label><input type="number" class="apple-input mt-1" style="color: #ff9500; font-weight: bold;" @bind="tsForm.AdvancePayment" @bind:event="oninput" /></div>
+                            </div>
+
+                            <button class="btn-apple primary mt-3" style="width: 100%; font-size: 16px; padding: 12px;" @onclick="SaveAndDownloadTimesheet">
+                                <i class="bi bi-file-earmark-pdf-fill me-2"></i> Зберегти та Завантажити PDF
+                            </button>
+                        </div>
+                    </div>
+
+                    @* ПРАВА ПАНЕЛЬ: ПОПЕРЕДНІЙ ПЕРЕГЛЯД (А4) *@
+                    <div class="print-container">
+                        <div id="printable-timesheet" style="background: white; width: 100%; padding: 40px 50px; border-radius: 8px; box-shadow: 0 10px 30px rgba(0,0,0,.1); border: 1px solid #e0e0e0; color: #000; font-family: 'Arial', sans-serif;">
+
+                            <div style="text-align: center; margin-bottom: 30px;">
+                                <h2 style="margin: 0; font-weight: 800; text-transform: uppercase; font-size: 24px; letter-spacing: 1px;">Зарплатний Табель</h2>
+                                <div style="font-size: 16px; color: #555; margin-top: 5px;">за період: <b>@tsForm.Month</b></div>
+                            </div>
+
+                            <div style="margin-bottom: 25px; font-size: 16px;">
+                                <table style="width: 100%;">
+                                    <tr>
+                                        <td style="width: 150px; color: #666;"><b>Працівник:</b></td>
+                                        <td style="font-size: 18px; font-weight: 700; border-bottom: 1px solid #000;">
+                                            @(string.IsNullOrWhiteSpace(tsForm.FullName) ? "________________________" : tsForm.FullName)
+                                        </td>
+                                    </tr>
+                                </table>
+                            </div>
+
+                            <h4 style="font-size: 14px; text-transform: uppercase; border-bottom: 2px solid #000; padding-bottom: 5px; margin-bottom: 15px; font-weight: 700;">1. Статистика роботи</h4>
+                            <table style="width: 100%; border-collapse: collapse; margin-bottom: 30px; font-size: 14px;">
+                                <thead>
+                                    <tr style="background: #f8f8f8;">
+                                        <th style="border: 1px solid #ddd; padding: 10px; text-align: left;">Показник</th>
+                                        <th style="border: 1px solid #ddd; padding: 10px; text-align: right; width: 150px;">Кількість / Сума</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr><td style="border: 1px solid #ddd; padding: 10px;">Відпрацьовано робочих днів</td><td style="border: 1px solid #ddd; padding: 10px; text-align: right; font-weight: bold;">@tsForm.WorkingDays</td></tr>
+                                    <tr><td style="border: 1px solid #ddd; padding: 10px;">Запізнення на зміну</td><td style="border: 1px solid #ddd; padding: 10px; text-align: right; font-weight: bold; color: #d9534f;">@tsForm.Latenesses</td></tr>
+                                    <tr><td style="border: 1px solid #ddd; padding: 10px;">Продано iPhone</td><td style="border: 1px solid #ddd; padding: 10px; text-align: right; font-weight: bold;">@tsForm.IphonesSold шт</td></tr>
+                                    <tr><td style="border: 1px solid #ddd; padding: 10px;">Продано iPad / Watch / AirPods / Mac</td><td style="border: 1px solid #ddd; padding: 10px; text-align: right; font-weight: bold;">@tsForm.OtherAppleSold шт</td></tr>
+                                    <tr><td style="border: 1px solid #ddd; padding: 10px;">Продано гарантій</td><td style="border: 1px solid #ddd; padding: 10px; text-align: right; font-weight: bold;">@tsForm.WarrantiesSold шт</td></tr>
+                                    <tr><td style="border: 1px solid #ddd; padding: 10px;">Оборот проданих аксесуарів</td><td style="border: 1px solid #ddd; padding: 10px; text-align: right; font-weight: bold;">@tsForm.AccessoriesRevenueUAH.ToString("N0") ₴</td></tr>
+                                    <tr><td style="border: 1px solid #ddd; padding: 10px;">Надано послуг / ремонтів</td><td style="border: 1px solid #ddd; padding: 10px; text-align: right; font-weight: bold;">@tsForm.ServicesSold шт</td></tr>
+                                </tbody>
+                            </table>
+
+                            <h4 style="font-size: 14px; text-transform: uppercase; border-bottom: 2px solid #000; padding-bottom: 5px; margin-bottom: 15px; font-weight: 700;">2. Деталізація нарахувань</h4>
+                            <table style="width: 100%; border-collapse: collapse; margin-bottom: 30px; font-size: 14px;">
+                                <thead>
+                                    <tr style="background: #f8f8f8;">
+                                        <th style="border: 1px solid #ddd; padding: 10px; text-align: left;">Стаття нарахування</th>
+                                        <th style="border: 1px solid #ddd; padding: 10px; text-align: right; width: 150px;">Сума (Грн)</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr><td style="border: 1px solid #ddd; padding: 10px;">Базова ставка за дні</td><td style="border: 1px solid #ddd; padding: 10px; text-align: right;">@tsForm.BaseSalaryAmount.ToString("N2")</td></tr>
+                                    <tr><td style="border: 1px solid #ddd; padding: 10px;">Бонус за продаж iPhone</td><td style="border: 1px solid #ddd; padding: 10px; text-align: right;">@tsForm.IphonesBonusAmount.ToString("N2")</td></tr>
+                                    <tr><td style="border: 1px solid #ddd; padding: 10px;">Бонус за продаж iPad/Watch/Mac</td><td style="border: 1px solid #ddd; padding: 10px; text-align: right;">@tsForm.OtherAppleBonusAmount.ToString("N2")</td></tr>
+                                    <tr><td style="border: 1px solid #ddd; padding: 10px;">Бонус за продаж гарантій</td><td style="border: 1px solid #ddd; padding: 10px; text-align: right;">@tsForm.WarrantiesBonusAmount.ToString("N2")</td></tr>
+                                    <tr><td style="border: 1px solid #ddd; padding: 10px;">Відсоток від аксесуарів</td><td style="border: 1px solid #ddd; padding: 10px; text-align: right;">@tsForm.AccessoriesBonusAmount.ToString("N2")</td></tr>
+                                    <tr><td style="border: 1px solid #ddd; padding: 10px;">Відсоток від послуг</td><td style="border: 1px solid #ddd; padding: 10px; text-align: right;">@tsForm.ServicesBonusAmount.ToString("N2")</td></tr>
+                                    <tr><td style="border: 1px solid #ddd; padding: 10px; color: var(--apple-blue); font-weight: bold;">Особлива Премія</td><td style="border: 1px solid #ddd; padding: 10px; text-align: right; font-weight: bold; color: var(--apple-blue);">+@tsForm.BonusAmount.ToString("N2")</td></tr>
+                                    <tr><td style="border: 1px solid #ddd; padding: 10px; color: #d9534f;">Штрафи / Утримання</td><td style="border: 1px solid #ddd; padding: 10px; text-align: right; color: #d9534f;">-@tsForm.PenaltyAmount.ToString("N2")</td></tr>
+                                </tbody>
+                                <tfoot>
+                                    <tr style="background: #f0f0f0; font-weight: 900; font-size: 18px;">
+                                        <td style="border: 1px solid #ddd; padding: 12px; text-align: right; text-transform: uppercase;">ВСЬОГО НАРАХОВАНО:</td>
+                                        <td style="border: 1px solid #ddd; padding: 12px; text-align: right; white-space: nowrap;">@tsForm.TotalAccrued.ToString("N2") ₴</td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+
+                            <div style="background: #fff; border: 1px solid #ddd; padding: 15px; border-radius: 8px; margin-bottom: 40px;">
+                                <div style="display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 14px; color: #666;">
+                                    <span>Раніше виданий аванс:</span>
+                                    <span style="font-weight: bold; white-space: nowrap;">@tsForm.AdvancePayment.ToString("N2") ₴</span>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; font-size: 18px; font-weight: 700; color: #000; border-top: 1px solid #ddd; padding-top: 10px;">
+                                    <span>До виплати (на руки):</span>
+                                    <span style="white-space: nowrap;">@tsForm.FinalPayout.ToString("N0") ₴</span>
+                                </div>
+                            </div>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin-top: 50px;">
+                                <div style="text-align: center;">
+                                    <div style="border-bottom: 1px solid #000; height: 30px; margin-bottom: 5px;"></div>
+                                    <div style="font-size: 12px; color: #666;">Підпис Керівника</div>
+                                </div>
+                                <div style="text-align: center;">
+                                    <div style="border-bottom: 1px solid #000; height: 30px; margin-bottom: 5px;"></div>
+                                    <div style="font-size: 12px; color: #666;">Підпис Працівника (з сумою згоден)</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            }
+            else
+            {
+                <div class="apple-card no-print">
+                    <table class="apple-table">
+                        <thead>
+                            <tr>
+                                <th>Дата збереження</th>
+                                <th>ПІБ працівника</th>
+                                <th>Місяць</th>
+                                <th>Нараховано</th>
+                                <th>Виплачено</th>
+                                <th style="text-align: right;">Дія</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @if (!timesheetArchives.Any())
+                            {
+                                <tr><td colspan="6" class="text-center py-4 text-muted">Архів порожній</td></tr>
+                            }
+                            @foreach (var arc in timesheetArchives)
+                            {
+                                <tr>
+                                    <td>@arc.CreatedAt.ToString("dd.MM.yyyy HH:mm")</td>
+                                    <td style="font-weight: 600;">@arc.FullName</td>
+                                    <td>@arc.Month</td>
+                                    <td style="color: var(--apple-blue); font-weight: bold;">@arc.TotalAccrued.ToString("N0") ₴</td>
+                                    <td style="color: var(--apple-green); font-weight: bold;">@arc.FinalPayout.ToString("N0") ₴</td>
+                                    <td style="text-align: right;">
+                                        <button class="btn-apple outline" @onclick="() => DownloadArchivedPdf(arc)">
+                                            <i class="bi bi-download"></i> PDF
+                                        </button>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        }
+    }
+</div>
+
+@* МОДАЛКИ *@
+@if (showUserModal)
+{
+    <div class="modal-backdrop-apple" @onclick="() => showUserModal = false">
+        <div class="modal-sheet" @onclick:stopPropagation>
+            <div class="ms-header">
+                <h3 class="ms-title">Створити працівника</h3>
+                <button class="ms-close" @onclick="() => showUserModal = false"><i class="bi bi-x"></i></button>
+            </div>
+            <div class="ms-body">
+                <label class="apple-label">ПІБ (буде видно в чеку)</label>
+                <input type="text" class="apple-input" @bind="newUser.FullName" placeholder="Іван Іванов" />
+                <label class="apple-label">Логін (Email або нікнейм)</label>
+                <input type="text" class="apple-input" @bind="newUser.Email" placeholder="ivan@shop.com" />
+                <label class="apple-label">Пароль</label>
+                <input type="text" class="apple-input" @bind="newUser.Password" placeholder="Мінімум 6 символів" />
+                <label class="apple-label">Магазин (Точка)</label>
+                <select class="apple-input" @bind="newUser.StoreId">
+                    <option value="0">Оберіть магазин...</option>
+                    @foreach (var store in stores)
+                    {
+                        <option value="@store.Id">@store.Name</option>
+                    }
+                </select>
+                <label class="apple-label">Роль в системі</label>
+                <select class="apple-input" @bind="newUser.Role">
+                    <option value="Manager">Менеджер (Продажі)</option>
+                    <option value="Admin">Адміністратор (Повний доступ)</option>
+                </select>
+                @if (!string.IsNullOrEmpty(userError))
+                {
+                    <div style="color:var(--apple-red); font-size:13px; text-align:center;">@userError</div>
+                }
+            </div>
+            <div class="ms-footer">
+                <button class="btn-apple outline" @onclick="() => showUserModal = false">Скасувати</button>
+                <button class="btn-apple primary" @onclick="CreateUser">Створити</button>
+            </div>
+        </div>
+    </div>
+}
+
+@if (showEditUserModal)
+{
+    <div class="modal-backdrop-apple" @onclick="() => showEditUserModal = false">
+        <div class="modal-sheet" @onclick:stopPropagation>
+            <div class="ms-header">
+                <h3 class="ms-title">Редагувати: @editingUser.FullName</h3>
+                <button class="ms-close" @onclick="() => showEditUserModal = false"><i class="bi bi-x"></i></button>
+            </div>
+            <div class="ms-body">
+                <label class="apple-label">ПІБ</label>
+                <input type="text" class="apple-input" @bind="editingUser.FullName" />
+                <label class="apple-label">Магазин</label>
+                <select class="apple-input" @bind="editingUser.StoreId">
+                    <option value="0">Без магазину</option>
+                    @foreach (var store in stores)
+                    {
+                        <option value="@store.Id">@store.Name</option>
+                    }
+                </select>
+                <label class="apple-label">Роль в системі</label>
+                <select class="apple-input" @bind="editingUser.Role">
+                    <option value="Manager">Менеджер (Продажі)</option>
+                    <option value="Technician">Майстер (Ремонти)</option>
+                    <option value="Admin">Адміністратор (Повний доступ)</option>
+                </select>
+                <label class="apple-label">Новий пароль</label>
+                <input type="text" class="apple-input" @bind="editingUser.Password" placeholder="Залиште порожнім, щоб не змінювати" />
+            </div>
+            <div class="ms-footer">
+                <button class="btn-apple outline" @onclick="() => showEditUserModal = false">Скасувати</button>
+                <button class="btn-apple primary" @onclick="SaveChangesUser">Зберегти</button>
+            </div>
+        </div>
+    </div>
+}
+
+@if (selectedKpiManager != null)
+{
+    <div class="modal-backdrop-apple" @onclick="() => selectedKpiManager = null">
+        <div class="modal-sheet lg" @onclick:stopPropagation>
+            <div class="ms-header">
+                <div>
+                    <h3 class="ms-title">Деталі: @selectedKpiManager.UserName</h3>
+                    <div style="font-size: 12px; color: var(--apple-sub);">За період: @startDate.ToString("dd.MM.yyyy") — @endDate.ToString("dd.MM.yyyy")</div>
+                </div>
+                <button class="ms-close" @onclick="() => selectedKpiManager = null"><i class="bi bi-x"></i></button>
+            </div>
+            <div class="ms-body" style="background: #fafafa;">
+                @foreach (var group in selectedKpiManager.Details.GroupBy(d => d.Category).OrderBy(g => g.Key))
+                {
+                    bool isExpanded = expandedKpiCategories.Contains(group.Key);
+                    <div class="kpi-category-header shadow-sm" @onclick="() => ToggleKpiCategory(group.Key)">
+                        <div style="display:flex; align-items:center; gap:10px;">
+                            <span style="font-weight:700; font-size:15px; color:var(--apple-text);">@GetCategoryLabel(group.Key)</span>
+                            <span class="badge bg-secondary bg-opacity-10 text-dark">@group.Sum(x => x.Quantity) шт</span>
+                        </div>
+                        <div style="display:flex; align-items:center; gap:16px;">
+                            <div style="text-align:right;">
+                                <div style="font-weight:700; font-size:14px;">@group.Sum(x => x.RevenueUAH).ToString("N0") ₴</div>
+                                <div style="font-weight:700; font-size:12px; color:var(--apple-green);">+$@group.Sum(x => x.ProfitUSD).ToString("N0")</div>
+                            </div>
+                            <i class="bi @(isExpanded ? "bi-chevron-up" : "bi-chevron-down")"></i>
+                        </div>
+                    </div>
+                    @if (isExpanded)
+                    {
+                        <div class="kpi-category-content">
+                            <table class="apple-table" style="background:#fff; border-radius:8px; border:1px solid var(--apple-border);">
+                                <thead>
+                                    <tr><th>Чек / Дата</th><th>Назва товару</th><th style="text-align:center;">К-сть</th><th style="text-align:right;">Оборот</th><th style="text-align:right;">Прибуток</th></tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var item in group)
+                                    {
+                                        <tr>
+                                            <td style="width: 130px;"><div style="font-weight: 600;">@item.Date.ToString("dd.MM.yy HH:mm")</div><div style="font-size:11px; color:var(--apple-blue);">#@item.SaleId</div></td>
+                                            <td style="font-weight: 600;">@item.ItemName</td>
+                                            <td style="text-align: center;">@item.Quantity</td>
+                                            <td style="text-align: right; font-weight: 600;">@item.RevenueUAH.ToString("N0") ₴</td>
+                                            <td style="text-align: right; font-weight: 700; color: var(--apple-green);">+$@item.ProfitUSD.ToString("N0")</td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                }
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private string currentTab = "users";
+    private bool isLoading = true;
+    private PayrollDto? selectedPayroll = null;
+
+    private bool showBlockedUsers = false; // 🔥 ФІЛЬТР ДЛЯ ЗАБЛОКОВАНИХ
+
+    // Дати
+    private DateTime startDate = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1);
+    private DateTime endDate = DateTime.Today;
+    private DateTime payrollMonthYear = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1);
+
+    // Дані
+    private List<UserListDto> usersList = new();
+    private List<SalaryRuleDto> salaryRules = new();
+    private List<ShiftDto> shifts = new();
+    private List<ManagerKpiDto> kpis = new();
+    private List<PayrollDto> payrolls = new();
+    private List<Store> stores = new();
+
+    // ДЛЯ АРХІВУ
+    private TimesheetFormDto tsForm = new();
+    private List<TimesheetArchiveDto> timesheetArchives = new();
+    private bool isArchiveView = false;
+
+    // Модалки
+    private bool showUserModal = false, showEditUserModal = false;
+    private string userError = "", userEditError = "";
+    private NewUserDto newUser = new() { Role = "Manager" };
+    private UpdateUserDto editingUser = new();
+
+    private ManagerKpiDto? selectedKpiManager = null;
+    private HashSet<string> expandedKpiCategories = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadStores();
+        await SwitchTab("users");
+    }
+
+    private async Task LoadStores()
+    {
+        try { stores = await Http.GetFromJsonAsync<List<Store>>("api/transfers/stores") ?? new(); } catch { }
+    }
+
+    private async Task SwitchTab(string tab)
+    {
+        currentTab = tab;
+        if (tab == "timesheet-pdf") return;
+        await LoadTabData();
+    }
+
+    private async Task LoadTabData()
+    {
+        isLoading = true;
+        StateHasChanged();
+        try
+        {
+            string dateQuery = $"?start={startDate:yyyy-MM-dd}&end={endDate:yyyy-MM-dd}&_={DateTime.Now.Ticks}";
+
+            if (currentTab == "users") usersList = await Http.GetFromJsonAsync<List<UserListDto>>("api/admin/users") ?? new();
+            else if (currentTab == "rules") salaryRules = await Http.GetFromJsonAsync<List<SalaryRuleDto>>("api/admin/salary-rules") ?? new();
+            else if (currentTab == "shifts") shifts = await Http.GetFromJsonAsync<List<ShiftDto>>($"api/admin/shifts{dateQuery}") ?? new();
+            else if (currentTab == "kpi") kpis = await Http.GetFromJsonAsync<List<ManagerKpiDto>>($"api/admin/kpi{dateQuery}") ?? new();
+            else if (currentTab == "payroll")
+            {
+                string payrollQuery = $"?month={payrollMonthYear.Month}&year={payrollMonthYear.Year}&storeId=0&_={DateTime.Now.Ticks}";
+                payrolls = await Http.GetFromJsonAsync<List<PayrollDto>>($"api/admin/payroll{payrollQuery}") ?? new();
+            }
+        }
+        catch (Exception ex) { Console.WriteLine(ex.Message); }
+        finally { isLoading = false; StateHasChanged(); }
+    }
+
+    private async Task LoadArchives()
+    {
+        isArchiveView = true;
+        isLoading = true;
+        try
+        {
+            timesheetArchives = await Http.GetFromJsonAsync<List<TimesheetArchiveDto>>("api/admin/archive") ?? new();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex.Message);
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void SelectPayroll(PayrollDto p) { selectedPayroll = p; }
+
+    private void RecalculateSelected()
+    {
+        if (selectedPayroll == null) return;
+
+        selectedPayroll.BaseSalaryAmount = Math.Round((selectedPayroll.RuleMonthlyRate / 22m) * selectedPayroll.WorkingDays, 2);
+        selectedPayroll.DevicesBonusAmount = selectedPayroll.DevicesSold * selectedPayroll.RuleDeviceBonus;
+        selectedPayroll.WarrantiesBonusAmount = selectedPayroll.WarrantiesSold * selectedPayroll.RuleWarrantyBonus;
+        selectedPayroll.AccessoriesBonusAmount = Math.Round(selectedPayroll.AccessoriesRevenueUAH * (selectedPayroll.RuleAccPercent / 100m), 2);
+        selectedPayroll.ServicesBonusAmount = Math.Round(selectedPayroll.ServicesRevenueUAH * (selectedPayroll.RuleSrvPercent / 100m), 2);
+        selectedPayroll.LatenessPenaltyAmount = selectedPayroll.Latenesses * selectedPayroll.RulePenalty;
+
+        RecalculateTotalsOnly();
+    }
+
+    private void RecalculateTotalsOnly()
+    {
+        if (selectedPayroll == null) return;
+        selectedPayroll.BaseSalaryCalculated = selectedPayroll.BaseSalaryAmount + selectedPayroll.DevicesBonusAmount + selectedPayroll.WarrantiesBonusAmount + selectedPayroll.AccessoriesBonusAmount + selectedPayroll.ServicesBonusAmount - selectedPayroll.LatenessPenaltyAmount;
+        selectedPayroll.FinalPayout = selectedPayroll.BaseSalaryCalculated - selectedPayroll.AdvancePayment;
+    }
+
+    private async Task SaveSinglePayrollRecord()
+    {
+        if (selectedPayroll == null) return;
+
+        if (DateTime.TryParse(payrollMonthYear + "-01", out DateTime selectedMonth))
+        {
+            var confirm = await JS.InvokeAsync<bool>("confirm", $"Зберегти відомість для {selectedPayroll.EmployeeName}?");
+            if (!confirm) return;
+
+            string query = $"?month={selectedMonth.Month}&year={selectedMonth.Year}";
+            var res = await Http.PostAsJsonAsync($"api/admin/payroll/save{query}", new List<PayrollDto> { selectedPayroll });
+
+            if (res.IsSuccessStatusCode)
+            {
+                await JS.InvokeVoidAsync("alert", "✅ Успішно збережено!");
+                await LoadTabData();
+                selectedPayroll = payrolls.FirstOrDefault(p => p.UserId == selectedPayroll.UserId);
+            }
+            else await JS.InvokeVoidAsync("alert", "❌ Помилка збереження.");
+        }
+    }
+
+    private async Task SavePayrollRecords()
+    {
+        if (DateTime.TryParse(payrollMonthYear + "-01", out DateTime selectedMonth))
+        {
+            var confirm = await JS.InvokeAsync<bool>("confirm", $"Зберегти відомість та зафіксувати аванси за {selectedMonth.ToString("MM.yyyy")}?");
+            if (!confirm) return;
+
+            string query = $"?month={selectedMonth.Month}&year={selectedMonth.Year}";
+            var res = await Http.PostAsJsonAsync($"api/admin/payroll/save{query}", payrolls);
+
+            if (res.IsSuccessStatusCode)
+            {
+                await JS.InvokeVoidAsync("alert", "✅ Зарплатну відомість успішно збережено!");
+                await LoadTabData();
+            }
+            else await JS.InvokeVoidAsync("alert", "❌ Виникла помилка під час збереження.");
+        }
+    }
+
+    private async Task SaveAndDownloadTimesheet()
+    {
+        if (string.IsNullOrWhiteSpace(tsForm.FullName) || string.IsNullOrWhiteSpace(tsForm.Month))
+        {
+            await JS.InvokeVoidAsync("alert", "⚠️ Введіть ПІБ та Місяць, щоб зберегти документ!");
+            return;
+        }
+
+        try
+        {
+            var archiveResponse = await Http.PostAsJsonAsync("api/admin/archive", tsForm);
+
+            if (!archiveResponse.IsSuccessStatusCode)
+            {
+                string error = await archiveResponse.Content.ReadAsStringAsync();
+                await JS.InvokeVoidAsync("alert", $"❌ Помилка БД: {error}");
+                return;
+            }
+
+            var pdfResponse = await Http.PostAsJsonAsync("api/admin/generate-timesheet", tsForm);
+
+            if (pdfResponse.IsSuccessStatusCode)
+            {
+                var fileBytes = await pdfResponse.Content.ReadAsByteArrayAsync();
+                var base64 = Convert.ToBase64String(fileBytes);
+
+                string fName = tsForm.FullName.Replace(" ", "_");
+                string mName = tsForm.Month.Replace(" ", "_");
+                string fileName = $"Табель_{fName}_{mName}.pdf";
+
+                await JS.InvokeVoidAsync("eval", $@"
+                    var a = document.createElement('a');
+                    a.href = 'data:application/pdf;base64,{base64}';
+                    a.download = '{fileName}';
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                ");
+
+                await JS.InvokeVoidAsync("alert", "✅ Успішно збережено в архів та завантажено PDF!");
+            }
+            else
+            {
+                await JS.InvokeVoidAsync("alert", "❌ В БД збережено, але виникла помилка при генерації PDF.");
+            }
+        }
+        catch (Exception ex)
+        {
+            await JS.InvokeVoidAsync("alert", $"❌ Мережева помилка: {ex.Message}");
+        }
+    }
+
+    private async Task DownloadArchivedPdf(TimesheetArchiveDto arc)
+    {
+        try
+        {
+            var payload = new TimesheetFormDto
+            {
+                FullName = arc.FullName,
+                Month = arc.Month,
+                WorkingDays = arc.WorkingDays,
+                Latenesses = arc.Latenesses,
+                IphonesSold = arc.IphonesSold,
+                OtherAppleSold = arc.OtherAppleSold,
+                WarrantiesSold = arc.WarrantiesSold,
+                AccessoriesRevenueUAH = arc.AccessoriesRevenueUAH,
+                ServicesSold = arc.ServicesSold,
+                BaseSalaryAmount = arc.BaseSalaryAmount,
+                IphonesBonusAmount = arc.IphonesBonusAmount,
+                OtherAppleBonusAmount = arc.OtherAppleBonusAmount,
+                WarrantiesBonusAmount = arc.WarrantiesBonusAmount,
+                AccessoriesBonusAmount = arc.AccessoriesBonusAmount,
+                ServicesBonusAmount = arc.ServicesBonusAmount,
+                BonusAmount = arc.BonusAmount,
+                PenaltyAmount = arc.PenaltyAmount,
+                AdvancePayment = arc.AdvancePayment
+            };
+
+            var pdfResponse = await Http.PostAsJsonAsync("api/admin/generate-timesheet", payload);
+
+            if (pdfResponse.IsSuccessStatusCode)
+            {
+                var fileBytes = await pdfResponse.Content.ReadAsByteArrayAsync();
+                var base64 = Convert.ToBase64String(fileBytes);
+
+                string fName = string.IsNullOrWhiteSpace(arc.FullName) ? "Працівник" : arc.FullName.Replace(" ", "_");
+                string mName = string.IsNullOrWhiteSpace(arc.Month) ? "Місяць" : arc.Month.Replace(" ", "_");
+                string fileName = $"Табель_{fName}_{mName}.pdf";
+
+                await JS.InvokeVoidAsync("eval", $@"
+                    var a = document.createElement('a');
+                    a.href = 'data:application/pdf;base64,{base64}';
+                    a.download = '{fileName}';
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                ");
+            }
+            else
+            {
+                string errorMsg = await pdfResponse.Content.ReadAsStringAsync();
+                await JS.InvokeVoidAsync("alert", $"❌ Помилка сервера: {errorMsg}");
+            }
+        }
+        catch (Exception ex)
+        {
+            await JS.InvokeVoidAsync("alert", $"❌ Мережева помилка: {ex.Message}");
+        }
+    }
+
+    private async Task CreateUser()
+    {
+        userError = "";
+        if (string.IsNullOrWhiteSpace(newUser.FullName) || string.IsNullOrWhiteSpace(newUser.Password)) { userError = "Заповніть всі поля!"; return; }
+        var res = await Http.PostAsJsonAsync("api/admin/create-user", newUser);
+        if (res.IsSuccessStatusCode) { await JS.InvokeVoidAsync("alert", "Створено!"); showUserModal = false; newUser = new() { Role = "Manager" }; await LoadTabData(); }
+        else userError = await res.Content.ReadAsStringAsync();
+    }
+
+    private void OpenEditUserModal(UserListDto u) { userEditError = ""; editingUser = new UpdateUserDto { Id = u.Id, FullName = u.FullName, StoreId = u.StoreId ?? 0, Role = u.Role, Password = "" }; showEditUserModal = true; }
+
+    private async Task SaveChangesUser()
+    {
+        if (string.IsNullOrWhiteSpace(editingUser.FullName)) { userEditError = "ПІБ не може бути порожнім!"; return; }
+        var res = await Http.PutAsJsonAsync($"api/admin/users/{editingUser.Id}", editingUser);
+        if (res.IsSuccessStatusCode) { showEditUserModal = false; await LoadTabData(); }
+        else userEditError = await res.Content.ReadAsStringAsync();
+    }
+
+    // 🔥 БЛОКУВАННЯ ТА РОЗБЛОКУВАННЯ
+    private async Task BlockUser(string id, string name)
+    {
+        if (await JS.InvokeAsync<bool>("confirm", $"Заблокувати доступ для {name}?\nКористувач більше не зможе увійти в систему, але його дані та історія продажів збережуться."))
+        {
+            var res = await Http.PostAsync($"api/admin/users/{id}/block", null);
+            if (res.IsSuccessStatusCode) await LoadTabData();
+            else await JS.InvokeVoidAsync("alert", await res.Content.ReadAsStringAsync());
+        }
+    }
+
+    private async Task UnblockUser(string id, string name)
+    {
+        if (await JS.InvokeAsync<bool>("confirm", $"Відновити доступ для {name}?"))
+        {
+            var res = await Http.PostAsync($"api/admin/users/{id}/unblock", null);
+            if (res.IsSuccessStatusCode) await LoadTabData();
+            else await JS.InvokeVoidAsync("alert", await res.Content.ReadAsStringAsync());
+        }
+    }
+
+    private async Task SaveRule(SalaryRuleDto rule)
+    {
+        var res = await Http.PostAsJsonAsync("api/admin/salary-rules/update", rule);
+        if (res.IsSuccessStatusCode) await JS.InvokeVoidAsync("alert", "✅ Збережено!");
+        else await JS.InvokeVoidAsync("alert", "❌ Помилка!");
+    }
+
+    private void OpenKpiDetails(ManagerKpiDto manager) { selectedKpiManager = manager; expandedKpiCategories.Clear(); }
+    private void ToggleKpiCategory(string category) { if (expandedKpiCategories.Contains(category)) expandedKpiCategories.Remove(category); else expandedKpiCategories.Add(category); }
+    private string GetCategoryLabel(string cat) => cat switch { "Device" => "Техніка", "Accessory" => "Аксесуари", "Service" => "Ремонти", "PosService" => "Послуги", "Warranty" => "Гарантії", _ => "Інше" };
+
+    // --- КЛАСИ DTO ---
+    public class ShiftDto { public string UserName { get; set; } = ""; public string StoreName { get; set; } = ""; public DateTime WorkDate { get; set; } public DateTime? ClockInTime { get; set; } public DateTime? ClockOutTime { get; set; } }
+    public class NewUserDto { public string FullName { get; set; } = ""; public string Email { get; set; } = ""; public string Password { get; set; } = ""; public string Role { get; set; } = "Manager"; public int StoreId { get; set; } = 0; }
+    public class UserListDto { public string Id { get; set; } = ""; public string FullName { get; set; } = ""; public string Email { get; set; } = ""; public string Role { get; set; } = ""; public int? StoreId { get; set; } public string StoreName { get; set; } = ""; public bool IsBlocked { get; set; } }
+    public class UpdateUserDto { public string Id { get; set; } = ""; public string FullName { get; set; } = ""; public int StoreId { get; set; } public string Role { get; set; } = ""; public string Password { get; set; } = ""; }
+    public class SalaryRuleDto { public string UserId { get; set; } = ""; public string EmployeeName { get; set; } = ""; public string Role { get; set; } = ""; public string StoreName { get; set; } = ""; public decimal MonthlyBaseSalary { get; set; } public decimal PenaltyPerLateness { get; set; } public decimal BonusPerDevice { get; set; } public decimal BonusPerWarranty { get; set; } public decimal AccessoryBonusPercent { get; set; } public decimal ServiceBonusPercent { get; set; } }
+    public class ManagerCategoryStatsDto { public int Count { get; set; } public decimal RevenueUAH { get; set; } public decimal ProfitUSD { get; set; } }
+    public class ManagerSaleItemDetailDto { public int SaleId { get; set; } public DateTime Date { get; set; } public string ItemName { get; set; } = ""; public string Category { get; set; } = ""; public int Quantity { get; set; } public decimal RevenueUAH { get; set; } public decimal ProfitUSD { get; set; } }
+    public class ManagerKpiDto { public string UserName { get; set; } = ""; public int ItemsSold { get; set; } public decimal TotalRevenueUAH { get; set; } public decimal TotalProfitUSD { get; set; } public ManagerCategoryStatsDto Devices { get; set; } = new(); public ManagerCategoryStatsDto Accessories { get; set; } = new(); public ManagerCategoryStatsDto Repairs { get; set; } = new(); public ManagerCategoryStatsDto Services { get; set; } = new(); public ManagerCategoryStatsDto Warranties { get; set; } = new(); public List<ManagerSaleItemDetailDto> Details { get; set; } = new(); }
+
+    public class PayrollDto
+    {
+        public int? RecordId { get; set; }
+        public string UserId { get; set; } = "";
+        public string EmployeeName { get; set; } = "";
+        public int StoreId { get; set; }
+        public string StoreName { get; set; } = "";
+        public int WorkingDays { get; set; }
+        public int Latenesses { get; set; }
+        public int DevicesSold { get; set; }
+        public int WarrantiesSold { get; set; }
+        public decimal AccessoriesRevenueUAH { get; set; }
+        public decimal ServicesRevenueUAH { get; set; }
+
+        public decimal BaseSalaryAmount { get; set; }
+        public decimal DevicesBonusAmount { get; set; }
+        public decimal WarrantiesBonusAmount { get; set; }
+        public decimal AccessoriesBonusAmount { get; set; }
+        public decimal ServicesBonusAmount { get; set; }
+        public decimal LatenessPenaltyAmount { get; set; }
+
+        public decimal RuleMonthlyRate { get; set; }
+        public decimal RulePenalty { get; set; }
+        public decimal RuleDeviceBonus { get; set; }
+        public decimal RuleWarrantyBonus { get; set; }
+        public decimal RuleAccPercent { get; set; }
+        public decimal RuleSrvPercent { get; set; }
+
+        public decimal BaseSalaryCalculated { get; set; }
+        public decimal AdvancePayment { get; set; }
+        public decimal FinalPayout { get; set; }
+        public bool IsSaved => RecordId.HasValue;
+    }
+
+    public class TimesheetFormDto
+    {
+        public string FullName { get; set; } = "";
+        public string Month { get; set; } = DateTime.Today.AddMonths(-1).ToString("MMMM yyyy");
+
+        public int WorkingDays { get; set; }
+        public int Latenesses { get; set; }
+        public decimal IphonesSold { get; set; }
+        public decimal OtherAppleSold { get; set; }
+        public int WarrantiesSold { get; set; }
+        public decimal AccessoriesRevenueUAH { get; set; }
+        public int ServicesSold { get; set; }
+
+        public decimal BaseSalaryAmount { get; set; }
+        public decimal IphonesBonusAmount { get; set; }
+        public decimal OtherAppleBonusAmount { get; set; }
+        public decimal WarrantiesBonusAmount { get; set; }
+        public decimal AccessoriesBonusAmount { get; set; }
+        public decimal ServicesBonusAmount { get; set; }
+        public decimal BonusAmount { get; set; }
+        public decimal PenaltyAmount { get; set; }
+        public decimal AdvancePayment { get; set; }
+
+        public decimal TotalAccrued => BaseSalaryAmount + IphonesBonusAmount + OtherAppleBonusAmount + WarrantiesBonusAmount + AccessoriesBonusAmount + ServicesBonusAmount + BonusAmount - PenaltyAmount;
+        public decimal FinalPayout => TotalAccrued - AdvancePayment;
+    }
+
+    public class TimesheetArchiveDto : TimesheetFormDto
+    {
+        public int Id { get; set; }
+        public DateTime CreatedAt { get; set; }
+    }
+}

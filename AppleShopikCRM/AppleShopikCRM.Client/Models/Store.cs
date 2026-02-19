@@ -21,5 +21,10 @@ namespace AppleShopikCRM.Client.Models
 
         [Column(TypeName = "decimal(18,2)")]
         public decimal BalanceCard { get; set; } // Безготівковий рахунок
+
+        public decimal MonthlyExpensesUAH { get; set; } // Наприклад, 30000 (оренда + ЗП + інше)
+        public decimal ExchangeRate { get; set; }
+
+        public string? InventoryCsvUrl { get; set; }
     }
 }

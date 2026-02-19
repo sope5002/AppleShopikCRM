@@ -1,4 +1,6 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using AppleShopikCRM.Client.Models;
+using AppleShopikCRM.Helpers;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using AppleShopikCRM.Client.Models;
 
@@ -21,6 +23,8 @@ namespace AppleShopikCRM.Controllers
         public async Task<ActionResult<IEnumerable<object>>> GetDevices()
         {
             var list = await _context.DeviceStock
+                .AsNoTracking()
+                .Where(d => d.IsSold == 0 || d.IsSold == 2)
                 .Join(_context.Products, d => d.ProductId, p => p.Id, (d, p) => new {
                     d.Id,            // <--- Додай ID запису (важливо для переміщень!)
                     d.StoreId,       // <--- ОБОВ'ЯЗКОВО ДОДАЙ ЦЕ! Без цього фільтр не працює.
@@ -30,11 +34,13 @@ namespace AppleShopikCRM.Controllers
                     d.Capacity,
                     d.ConditionStatus,
                     d.BatteryHealth,
+                    IsSold = d.IsSold,
                     d.SellingPrice,
                     d.PurchasePrice,
                     ModelName = p.Name
                 })
                 .ToListAsync();
+
             return Ok(list);
         }
 
@@ -45,6 +51,18 @@ namespace AppleShopikCRM.Controllers
         {
             return await _context.Products.ToListAsync();
         }
+        // ==========================================
+        // 🔥 ПОВЕРНУТИЙ МЕТОД: ТАРИФИ ГАРАНТІЇ
+        // ==========================================
+        [HttpGet("warranty-rates")]
+        public async Task<IActionResult> GetWarrantyRates([FromQuery] string? modelName)
+        {
+            try
+            {
+                // Завантажуємо всі тарифи гарантій
+                var rates = await _context.WarrantyRates
+                    .AsNoTracking()
+                    .ToListAsync();
 
         // 3. ДОДАТИ НОВИЙ ПРИСТРІЙ
         [HttpPost("add-device")]
@@ -53,13 +71,13 @@ namespace AppleShopikCRM.Controllers
             device.DateAdded = DateTime.Now;
             device.LastUpdated = DateTime.Now;
             _context.DeviceStock.Add(device);
-            await _context.SaveChangesAsync();
+                        await _context.SaveChangesAsync();
             return Ok();
-        }
+                    }
         // 4. СТВОРЕННЯ НОВОГО ТОВАРУ (ДОВІДНИК)
         [HttpPost("add-product")]
         public async Task<IActionResult> AddProduct([FromBody] Product product)
-        {
+                {
             if (string.IsNullOrWhiteSpace(product.Name))
                 return BadRequest("Назва не може бути пуста");
 
@@ -72,8 +90,14 @@ namespace AppleShopikCRM.Controllers
             product.CategoryId = 2;
 
             _context.Products.Add(product);
-            await _context.SaveChangesAsync();
+                await _context.SaveChangesAsync();
             return Ok(product);
+            }
+            catch (Exception ex)
+            {
+                await transaction.RollbackAsync();
+                return StatusCode(500, $"Помилка бази даних: {ex.InnerException?.Message ?? ex.Message}");
+            }
         }
 
         [HttpGet("warranty-rates")]
@@ -94,9 +118,9 @@ namespace AppleShopikCRM.Controllers
 
             // 3. Якщо знайшли спеціальні тарифи — віддаємо їх
             if (rates.Any())
-            {
+                {
                 return Ok(rates);
-            }
+                }
 
             // 4. Якщо не знайшли — віддаємо Default (загальні для всіх)
             var defaults = await _context.WarrantyRates

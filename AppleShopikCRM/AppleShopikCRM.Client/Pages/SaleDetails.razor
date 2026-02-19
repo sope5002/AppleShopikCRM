@@ -60,6 +60,11 @@ else
             <tbody>
                 @foreach (var item in sale.SaleItems)
                 {
+                    // 🔥 Вираховуємо чисту ціну телефону
+                    decimal warrantyPrice = item.WarrantyPrice;
+                    decimal basePrice = item.SoldSellingPrice - warrantyPrice;
+
+                    // 1. Рядок з телефоном
                     <tr>
                         <td class="ps-0">
                             <span class="fw-bold">@item.ProductName</span>
@@ -71,6 +76,22 @@ else
                         <td class="text-center">@item.Quantity</td>
                         <td class="text-end pe-0">@((item.SoldSellingPrice * item.Quantity).ToString("N0"))</td>
                     </tr>
+
+                    // 2. Рядок з гарантією (якщо вона є)
+                    @if (warrantyPrice > 0)
+                    {
+                        string warrantyName = item.WarrantyRate != null
+                        ? $"+ Гарантія: {item.WarrantyRate.Type} ({item.WarrantyRate.TermMonths} міс.)"
+                        : "+ Додаткова гарантія";
+
+                        <tr>
+                            <td class="ps-0 text-muted fst-italic" style="font-size: 0.9em;">
+                                @warrantyName
+                            </td>
+                            <td class="text-center text-muted fst-italic">-</td>
+                            <td class="text-end pe-0 text-muted fst-italic">@warrantyPrice.ToString("N0")</td>
+                        </tr>
+                    }
                 }
             </tbody>
         </table>

@@ -30,6 +30,9 @@
         public string Method { get; set; } = "Готівка";
         public decimal Amount { get; set; }      // Сума у валюті (наприклад, 100$)
         public decimal ExchangeRate { get; set; } = 1; // Курс (для гривні = 1)
+        public string? Bank { get; set; }
+        public int? Months { get; set; }
+        public decimal CommissionAmount { get; set; }
     }
     public class TradeInDto
     {
@@ -62,6 +65,7 @@
         public int Quantity { get; set; }
         public decimal SellingPrice { get; set; }
         public decimal WarrantyPrice { get; set; }
+        public decimal WarrantyProfit { get; set; }
         public decimal Profit { get; set; }
     }
 
@@ -71,7 +75,7 @@
         public List<CartItemDto> Items { get; set; } = new();
         public List<SalePayment> Payments { get; set; } = new();
         public TradeInDto? TradeIns { get; set; }
-        
+
     }
     public class RepairPaymentRequest
     {
@@ -90,5 +94,6 @@
 
         // Дані продавця
         public string SellerName { get; set; } = "";
+        public decimal GlobalDiscount { get; set; }
     }
 }

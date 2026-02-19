@@ -36,9 +36,13 @@ namespace AppleShopikCRM.Client.Models
         // Фінанси
         public decimal CostPart { get; set; } // Собівартість запчастини
         public decimal Price { get; set; } // Ціна для клієнта (або скільки додасться до вартості телефону)
+        public int? TargetStoreId { get; set; }
 
         [System.ComponentModel.DataAnnotations.Schema.ForeignKey("DeviceStockId")]
         public DeviceStock? DeviceStock { get; set; }
+
+        public List<RepairItem> Items { get; set; } = new();
+
     }
 
     public enum RepairType { ClientService, InternalStock }

@@ -1,0 +1,1205 @@
+﻿@page "/suppliers"
+
+@using AppleShopikCRM.Client.Models
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.JSInterop
+@using System.Net.Http.Json
+
+@inject HttpClient Http
+@inject IJSRuntime JS
+@inject AuthenticationStateProvider AuthStateProvider
+@rendermode InteractiveWebAssembly
+
+<PageTitle>Постачальники — Apple Shopik</PageTitle>
+
+<style>
+    :root {
+        --apple-blue: #0071e3;
+        --apple-blue-h: #0077ed;
+        --apple-green: #34c759;
+        --apple-red: #ff3b30;
+        --apple-gray: #f5f5f7;
+        --apple-border: #d2d2d7;
+        --apple-text: #1d1d1f;
+        --apple-sub: #6e6e73;
+        --radius-lg: 14px;
+        --shadow-card: 0 2px 12px rgba(0,0,0,.07), 0 1px 3px rgba(0,0,0,.05);
+    }
+
+    .page-root {
+        padding: 20px;
+        font-family: -apple-system, sans-serif;
+        background: var(--apple-gray);
+        min-height: 100vh;
+        color: var(--apple-text);
+    }
+
+    .page-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+        flex-wrap: wrap;
+        gap: 16px;
+    }
+
+    .page-title {
+        font-size: 1.5rem;
+        font-weight: 700;
+        margin: 0;
+    }
+
+    .apple-card {
+        background: #fff;
+        border-radius: var(--radius-lg);
+        box-shadow: var(--shadow-card);
+        overflow: hidden;
+        border: 1px solid var(--apple-border);
+        margin-bottom: 20px;
+    }
+
+    .apple-table {
+        width: 100%;
+        border-collapse: collapse;
+        text-align: left;
+    }
+
+        .apple-table th {
+            padding: 14px 16px;
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--apple-sub);
+            border-bottom: 1px solid var(--apple-border);
+            background: #fafafa;
+            text-transform: uppercase;
+        }
+
+        .apple-table td {
+            padding: 14px 16px;
+            font-size: 14px;
+            border-bottom: 1px solid #f0f0f0;
+            vertical-align: middle;
+        }
+
+        .apple-table tr:hover td {
+            background: #fafafa;
+        }
+
+    .btn-apple {
+        border: none;
+        border-radius: 8px;
+        padding: 8px 16px;
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all .15s;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+    }
+
+        .btn-apple.primary {
+            background: var(--apple-blue);
+            color: #fff;
+        }
+
+            .btn-apple.primary:hover {
+                background: var(--apple-blue-h);
+            }
+
+        .btn-apple.success {
+            background: var(--apple-green);
+            color: #fff;
+        }
+
+        .btn-apple.outline {
+            background: transparent;
+            border: 1.5px solid var(--apple-border);
+            color: var(--apple-text);
+        }
+
+            .btn-apple.outline:hover {
+                background: var(--apple-gray);
+            }
+
+        .btn-apple:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+    .debt-badge {
+        padding: 6px 12px;
+        border-radius: 8px;
+        font-weight: 700;
+        font-size: 14px;
+        display: inline-block;
+    }
+
+        .debt-badge.danger {
+            background: rgba(255,59,48,.1);
+            color: var(--apple-red);
+        }
+
+        .debt-badge.success {
+            background: rgba(52,199,89,.1);
+            color: var(--apple-green);
+        }
+
+    .segment-control {
+        display: flex;
+        background: #e9e9eb;
+        border-radius: 10px;
+        padding: 4px;
+        gap: 4px;
+        margin-bottom: 20px;
+        width: fit-content;
+    }
+
+    .segment-btn {
+        border: none;
+        background: transparent;
+        border-radius: 8px;
+        padding: 8px 20px;
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--apple-sub);
+        cursor: pointer;
+        transition: all 0.2s;
+        position: relative;
+    }
+
+        .segment-btn.active {
+            background: #fff;
+            color: var(--apple-text);
+            box-shadow: 0 2px 6px rgba(0,0,0,.1);
+        }
+
+    .modal-backdrop-apple {
+        position: fixed;
+        inset: 0;
+        background: rgba(0,0,0,.45);
+        backdrop-filter: blur(4px);
+        z-index: 1050;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 16px;
+    }
+
+    .modal-sheet {
+        background: #fff;
+        border-radius: 18px;
+        width: 100%;
+        max-width: 450px;
+        box-shadow: 0 20px 60px rgba(0,0,0,.2);
+        display: flex;
+        flex-direction: column;
+        max-height: 90vh;
+    }
+
+        .modal-sheet.lg {
+            max-width: 700px;
+        }
+
+    .ms-header {
+        padding: 18px 20px 14px;
+        border-bottom: 1px solid var(--apple-border);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .ms-title {
+        font-size: 1.1rem;
+        font-weight: 700;
+        margin: 0;
+    }
+
+    .ms-close {
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        background: var(--apple-gray);
+        border: none;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--apple-sub);
+        cursor: pointer;
+    }
+
+    .ms-body {
+        padding: 20px;
+        overflow-y: auto;
+    }
+
+    .ms-footer {
+        padding: 14px 20px;
+        border-top: 1px solid var(--apple-border);
+        display: flex;
+        justify-content: flex-end;
+        gap: 10px;
+        background: #fafafa;
+        border-radius: 0 0 18px 18px;
+    }
+
+    .apple-input {
+        width: 100%;
+        padding: 10px 14px;
+        border: 1.5px solid var(--apple-border);
+        border-radius: 8px;
+        font-size: 14px;
+        outline: none;
+    }
+
+        .apple-input:focus {
+            border-color: var(--apple-blue);
+            box-shadow: 0 0 0 3px rgba(0,113,227,.1);
+        }
+
+    .apple-label {
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--apple-sub);
+        display: block;
+        margin-bottom: 6px;
+        margin-top: 12px;
+    }
+
+    .search-container {
+        position: relative;
+        width: 100%;
+    }
+
+    .autocomplete-dropdown {
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        background: #fff;
+        border: 1px solid #d2d2d7;
+        border-radius: 8px;
+        box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+        z-index: 9999;
+        max-height: 250px;
+        overflow-y: auto;
+        margin-top: 4px;
+    }
+
+    .ac-item {
+        padding: 10px 14px;
+        cursor: pointer;
+        font-size: 13px;
+        border-bottom: 1px solid #f0f0f0;
+        display: flex;
+        flex-direction: column;
+    }
+
+        .ac-item:last-child {
+            border-bottom: none;
+        }
+
+        .ac-item:hover {
+            background: #f5f5f7;
+            color: #0071e3;
+        }
+</style>
+
+<div class="page-root">
+    <div class="page-header">
+        <h1 class="page-title"><i class="bi bi-boxes me-2" style="color:var(--apple-blue);"></i>Постачальники та Борги</h1>
+        <button class="btn-apple primary" @onclick="() => OpenSupplierModal(null)">
+            <i class="bi bi-plus-lg"></i> Новий постачальник
+        </button>
+    </div>
+
+    @if (isAdmin)
+    {
+        <div class="segment-control">
+            <button class="segment-btn @(currentTab == "list" ? "active" : "")" @onclick='() => currentTab = "list"'>
+                <i class="bi bi-list-ul me-1"></i> Список
+            </button>
+            <button class="segment-btn @(currentTab == "debts" ? "active" : "")" @onclick='() => LoadDebtsTab()'>
+                <i class="bi bi-clock-history me-1"></i> Борги
+                @if (debts.Any())
+                {
+                    <span class="badge bg-warning rounded-pill" style="position:absolute; top:-5px; right:-5px; font-size: 10px; color: #000;">@debts.Count</span>
+                }
+            </button>
+            <button class="segment-btn @(currentTab == "history" ? "active" : "")" @onclick='() => LoadHistoryTab()'>
+                <i class="bi bi-check2-circle me-1"></i> Історія оплат
+            </button>
+        </div>
+    }
+
+    @if (isLoading)
+    {
+        <div style="text-align:center; padding: 40px; color:var(--apple-sub);">
+            <div class="spinner-border spinner-border-sm me-2"></div> Завантаження...
+        </div>
+    }
+    else
+    {
+        @if (currentTab == "list" || !isAdmin)
+        {
+            <div class="apple-card">
+                <table class="apple-table">
+                    <thead>
+                        <tr>
+                            <th>Постачальник</th>
+                            <th>Контакти / Нотатки</th>
+                            <th style="text-align:right;">Поточний борг</th>
+                            <th style="text-align:right;">Дії</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (!suppliers.Any())
+                        {
+                            <tr><td colspan="4" class="text-center py-4 text-muted">Постачальників не знайдено</td></tr>
+                        }
+                        @foreach (var s in suppliers)
+                        {
+                            <tr>
+                                <td style="font-weight:600; font-size: 15px;">@s.Name</td>
+                                <td>
+                                    <div>@s.Phone</div>
+                                    <div style="font-size: 12px; color: var(--apple-sub);">@s.Notes</div>
+                                </td>
+                                <td style="text-align:right;">
+                                    @if (s.Debt > 0)
+                                    {
+                                        <div class="debt-badge danger" title="Ми винні">-$@s.Debt.ToString("N2")</div>
+                                        <div style="font-size: 10px; color: var(--apple-sub);">Ми винні гроші</div>
+                                    }
+                                    else if (s.Debt < 0)
+                                    {
+                                        <div class="debt-badge success" title="Він винен нам">+$@Math.Abs(s.Debt).ToString("N2")</div>
+                                        <div style="font-size: 10px; color: var(--apple-sub);">Він винен нам</div>
+                                    }
+                                    else
+                                    {
+                                        <div style="color: var(--apple-sub); font-weight: 600;">$0.00</div>
+                                    }
+                                </td>
+                                <td style="text-align:right;">
+                                    <button class="btn-apple outline me-2" @onclick="() => OpenGiveDeviceModal(s)">
+                                        <i class="bi bi-box-arrow-right"></i> Віддати товар
+                                    </button>
+
+                                    <button class="btn-apple outline me-2" style="color: var(--apple-blue); border-color: var(--apple-blue);" @onclick="() => OpenOutboundDebtsModal(s)">
+                                        <i class="bi bi-info-circle"></i> Видані товари
+                                    </button>
+
+                                    @if (s.Debt > 0)
+                                    {
+                                        <button class="btn-apple success me-2" @onclick="() => OpenPaymentModal(s)">
+                                            <i class="bi bi-wallet2"></i> Погасити борг
+                                        </button>
+                                    }
+                                    else if (s.Debt < 0)
+                                    {
+                                        <button class="btn-apple outline me-2" style="color: var(--apple-green); border-color: var(--apple-green);" @onclick="() => OpenReceivePaymentModal(s, null, null)">
+                                            <i class="bi bi-cash-stack"></i> Отримати борг
+                                        </button>
+                                    }
+
+                                    @if (isAdmin)
+                                    {
+                                        <button class="btn-apple outline" @onclick="() => OpenSupplierModal(s)">
+                                            <i class="bi bi-pencil"></i>
+                                        </button>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+        else if (currentTab == "debts" && isAdmin)
+        {
+            @if (!debts.Any())
+            {
+                <div class="text-center py-5 text-muted">
+                    <i class="bi bi-emoji-sunglasses" style="font-size: 3rem; color: #ff9500;"></i>
+                    <h4 class="mt-3">Все чисто!</h4>
+                    <p>Немає жодного неоплаченого товару "Під реалізацію".</p>
+                </div>
+            }
+            else
+            {
+                <div style="display: grid; gap: 20px;">
+                    @foreach (var group in debts.GroupBy(d => d.SupplierName))
+                    {
+                        <div class="apple-card p-0" style="border: 2px solid rgba(255,149,0,.3);">
+                            <div style="background: rgba(255,149,0,.1); padding: 16px 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,149,0,.2);">
+                                <div>
+                                    <h5 style="margin:0; font-weight:700; color: #cc7700;"><i class="bi bi-person-badge me-2"></i>@group.Key</h5>
+                                    <div style="font-size: 12px; color: #995900; margin-top: 4px; font-weight: 600;">
+                                        Загальна вартість товару: $@group.Sum(x => x.PurchasePrice).ToString("N0")
+                                    </div>
+                                </div>
+                                <div style="text-align: right; background: #fff; padding: 8px 16px; border-radius: 10px; border: 1px solid rgba(255,59,48,.2); box-shadow: 0 2px 8px rgba(255,59,48,.1);">
+                                    <span style="font-size: 11px; color: var(--apple-red); text-transform: uppercase; font-weight: 700;">Реальний борг (за продане):</span>
+                                    <h4 style="margin:0; font-weight:800; color: var(--apple-red);">$@group.Where(x => x.IsSold).Sum(x => x.DebtUSD).ToString("N0")</h4>
+                                </div>
+                            </div>
+                            <table class="apple-table mb-0">
+                                <thead>
+                                    <tr>
+                                        <th>Товар</th>
+                                        <th>IMEI</th>
+                                        <th>Статус</th>
+                                        <th style="width: 220px;">Стан оплати</th>
+                                        <th style="text-align:right;">Дії</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var item in group)
+                                    {
+                                        <tr>
+                                            <td style="font-weight:600; vertical-align: middle;">@item.ModelName</td>
+                                            <td style="font-family:monospace; color:var(--apple-sub); vertical-align: middle;">@item.Identifier</td>
+                                            <td style="vertical-align: middle;">
+                                                @if (item.IsSold)
+                                                {
+                                                    <span class="badge bg-danger" style="box-shadow: 0 2px 4px rgba(255,59,48,.3);">Продано (Борг)</span>
+                                                }
+                                                else
+                                                {
+                                                    <span class="badge bg-secondary text-dark bg-opacity-25">На складі</span>
+                                                }
+                                            </td>
+                                            <td style="width: 220px; vertical-align: middle;">
+                                                <div style="font-size: 11px; color: var(--apple-sub); display: flex; justify-content: space-between; margin-bottom: 4px; font-weight: 600;">
+                                                    <span>Сплачено: $@item.PaidAmount.ToString("N0")</span>
+                                                    <span>Всього: $@item.PurchasePrice.ToString("N0")</span>
+                                                </div>
+                                                <div style="width: 100%; height: 8px; background: #e9e9eb; border-radius: 4px; overflow: hidden; box-shadow: inset 0 1px 2px rgba(0,0,0,.05);">
+                                                    @{
+                                                        var percent = item.PurchasePrice > 0 ? (item.PaidAmount / item.PurchasePrice) * 100 : 0;
+                                                    }
+                                                    <div style="@($"width: {Math.Round(percent)}%; height: 100%; background: var(--apple-green); border-radius: 4px;")"></div>
+                                                </div>
+                                                <div style="font-size: 13px; font-weight: 800; color: var(--apple-red); text-align: right; margin-top: 4px;">
+                                                    Залишок боргу: $@item.DebtUSD.ToString("N0")
+                                                </div>
+                                            </td>
+                                            <td style="text-align:right; vertical-align: middle;">
+                                                <button class="btn-apple outline @(item.IsSold ? "success" : "")" style="font-size: 12px; padding: 6px 12px;" @onclick="() => PayDeviceIndividual(item.DeviceId)">
+                                                    <i class="bi bi-check2-circle me-1"></i> @(item.IsSold ? "Погасити залишок" : "Викупити")
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                </div>
+            }
+        }
+        else if (currentTab == "history" && isAdmin)
+        {
+            @if (!paidHistory.Any())
+            {
+                <div class="text-center py-5 text-muted">
+                    <i class="bi bi-inbox" style="font-size: 3rem; color: var(--apple-sub); opacity: 0.5;"></i>
+                    <h4 class="mt-3">Історія порожня</h4>
+                </div>
+            }
+            else
+            {
+                <div style="display: flex; flex-direction: column; gap: 16px;">
+                    @foreach (var group in paidHistory.GroupBy(h => h.SupplierName))
+                    {
+                        bool isExpanded = expandedHistory.Contains(group.Key);
+                        <div class="apple-card p-0" style="border: 1px solid var(--apple-border);">
+                            <div style="padding: 16px 20px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; background: @(isExpanded ? "#fafafa" : "#fff"); transition: background 0.2s;" @onclick="() => ToggleHistory(group.Key)">
+                                <div>
+                                    <h5 style="margin:0; font-weight:700; color: var(--apple-text);"><i class="bi bi-check2-circle me-2" style="color: var(--apple-green);"></i>@group.Key</h5>
+                                    <div style="font-size: 13px; color: var(--apple-sub); margin-top: 4px; font-weight: 500;">
+                                        Викуплено: <span style="font-weight:700; color:var(--apple-text);">@group.Count()</span> шт.
+                                        <span style="margin: 0 6px;">•</span>
+                                        Сума оплат: <span style="font-weight:700; color:var(--apple-green);">$@group.Sum(x => x.PurchasePrice).ToString("N0")</span>
+                                    </div>
+                                </div>
+                                <button class="btn-apple outline" style="padding: 6px 12px; background: #fff;">
+                                    @(isExpanded ? "Згорнути" : "Деталі")
+                                </button>
+                            </div>
+                            @if (isExpanded)
+                            {
+                                <table class="apple-table mb-0" style="border-top: 1px solid var(--apple-border);">
+                                    <thead>
+                                        <tr>
+                                            <th>Товар</th>
+                                            <th>IMEI</th>
+                                            <th>Ціна закупки</th>
+                                            <th style="text-align: right;">Дата закриття</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var h in group)
+                                        {
+                                            <tr>
+                                                <td style="font-weight:600;">@h.ModelName</td>
+                                                <td style="font-family:monospace; color:var(--apple-sub);">@h.Identifier</td>
+                                                <td style="font-weight:700; color:var(--apple-green);">$@h.PurchasePrice.ToString("N0")</td>
+                                                <td style="color:var(--apple-sub); font-size:13px; text-align: right;">@h.DateAdded.ToString("dd.MM.yyyy")</td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            }
+                        </div>
+                    }
+                </div>
+            }
+        }
+    }
+</div>
+
+@* МОДАЛКА: ВІДДАНІ ТОВАРИ (ІСТОРІЯ ТА БОРГИ) *@
+@if (showOutboundDebtsModal && selectedSupplier != null)
+{
+    <div class="modal-backdrop-apple" @onclick="() => showOutboundDebtsModal = false">
+        <div class="modal-sheet lg" @onclick:stopPropagation>
+            <div class="ms-header">
+                <h3 class="ms-title"><i class="bi bi-info-circle me-2" style="color:var(--apple-blue);"></i>Видані товари: @selectedSupplier.Name</h3>
+                <button class="ms-close" @onclick="() => showOutboundDebtsModal = false"><i class="bi bi-x"></i></button>
+            </div>
+            <div class="ms-body" style="padding: 0;">
+                @if (isLoadingOutbound)
+                {
+                    <div style="text-align:center; padding: 40px; color:var(--apple-sub);">
+                        <div class="spinner-border spinner-border-sm me-2"></div> Завантаження...
+                    </div>
+                }
+                else if (!outboundDebts.Any())
+                {
+                    <div class="text-center py-5 text-muted">
+                        У цього постачальника немає історії виданих телефонів.
+                    </div>
+                }
+                else
+                {
+                    <table class="apple-table mb-0">
+                        <thead>
+                            <tr>
+                                <th>Дата</th>
+                                <th>Товар</th>
+                                <th style="text-align: right;">Статус / Борг</th>
+                                <th style="text-align: center;">Дії</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var d in outboundDebts)
+                            {
+                                <tr>
+                                    <td style="color:var(--apple-sub); font-size: 13px;">@d.Date.ToString("dd.MM.yyyy")</td>
+                                    <td>
+                                        <div style="font-weight: 600; color: var(--apple-text);">@d.ModelName</div>
+                                        <div style="font-family: monospace; font-size: 12px; color: var(--apple-sub);">@d.Imei</div>
+                                    </td>
+                                    <td style="text-align: right;">
+                                        @if (d.IsFullyPaid)
+                                        {
+                                            <div style="font-size: 11px; font-weight: 700; color: var(--apple-green); text-transform: uppercase;">
+                                                <i class="bi bi-check-circle-fill me-1"></i>@d.Status
+                                            </div>
+                                            <div style="font-size: 12px; color: var(--apple-sub);">Загальна ціна: $@d.AgreedPriceUSD.ToString("N0")</div>
+                                        }
+                                        else
+                                        {
+                                            <div style="font-size: 15px; font-weight: 700; color: var(--apple-red);">$@d.RemainingDebtUSD.ToString("N0")</div>
+                                            <div style="font-size: 11px; color: var(--apple-sub);">Борг (з $@d.AgreedPriceUSD.ToString("N0"))</div>
+                                        }
+                                    </td>
+                                    <td style="text-align: center; vertical-align: middle;">
+                                        @if (!d.IsFullyPaid)
+                                        {
+                                            <button class="btn-apple outline" style="padding: 6px 12px; font-size: 12px; color: var(--apple-green); border-color: var(--apple-green);" @onclick="() => OpenReceivePaymentModal(selectedSupplier, d.SaleId, d.RemainingDebtUSD)">
+                                                Отримати гроші
+                                            </button>
+                                        }
+                                        else
+                                        {
+                                            <span style="font-size: 18px; color: var(--apple-sub); opacity: 0.5;"><i class="bi bi-dash"></i></span>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                }
+            </div>
+            <div class="ms-footer">
+                <button class="btn-apple outline" @onclick="() => showOutboundDebtsModal = false">Закрити</button>
+            </div>
+        </div>
+    </div>
+}
+
+@* МОДАЛКА: СТВОРЕННЯ / РЕДАГУВАННЯ *@
+@if (showSupplierModal)
+{
+    <div class="modal-backdrop-apple" @onclick="() => showSupplierModal = false">
+        <div class="modal-sheet" @onclick:stopPropagation>
+            <div class="ms-header">
+                <h3 class="ms-title">@(editingSupplier.Id == 0 ? "Новий постачальник" : "Редагування")</h3>
+                <button class="ms-close" @onclick="() => showSupplierModal = false"><i class="bi bi-x"></i></button>
+            </div>
+            <div class="ms-body">
+                <label class="apple-label" style="margin-top:0;">Назва компанії / Ім'я *</label>
+                <input class="apple-input" @bind="editingSupplier.Name" disabled="@(!isAdmin && editingSupplier.Id != 0)" />
+
+                <label class="apple-label">Телефон</label>
+                <input class="apple-input" @bind="editingSupplier.Phone" disabled="@(!isAdmin && editingSupplier.Id != 0)" />
+
+                @if (isAdmin)
+                {
+                    <label class="apple-label">Початковий борг (в ДОЛАРАХ $)</label>
+                    <input type="number" class="apple-input" @bind="editingSupplier.Debt" />
+                }
+
+                <label class="apple-label">Нотатки</label>
+                <textarea class="apple-input" rows="3" @bind="editingSupplier.Notes" disabled="@(!isAdmin && editingSupplier.Id != 0)"></textarea>
+            </div>
+            <div class="ms-footer">
+                <button class="btn-apple outline" @onclick="() => showSupplierModal = false">Скасувати</button>
+                @if (isAdmin || editingSupplier.Id == 0)
+                {
+                    <button class="btn-apple primary" @onclick="SaveSupplier"><i class="bi bi-check-lg"></i> Зберегти</button>
+                }
+            </div>
+        </div>
+    </div>
+}
+
+@* МОДАЛКА: МИ ПЛАТИМО БОРГ (Віддаємо гроші) *@
+@if (showPaymentModal && selectedSupplier != null)
+{
+    <div class="modal-backdrop-apple" @onclick="() => showPaymentModal = false">
+        <div class="modal-sheet" @onclick:stopPropagation>
+            <div class="ms-header">
+                <h3 class="ms-title">Ми оплачуємо: @selectedSupplier.Name</h3>
+                <button class="ms-close" @onclick="() => showPaymentModal = false"><i class="bi bi-x"></i></button>
+            </div>
+            <div class="ms-body">
+                <div style="background:#e8f4fd; padding:12px; border-radius:8px; border:1px solid #b6d4fe; margin-bottom:10px;">
+                    <div style="font-size:12px; color:#084298;">Наш борг перед постачальником:</div>
+                    <div style="font-size:20px; font-weight:700; color:#052c65;">$@selectedSupplier.Debt.ToString("N2")</div>
+                </div>
+
+                @if (!string.IsNullOrEmpty(paymentError))
+                {
+                    <div style="color:var(--apple-red); font-size:13px; font-weight:600; margin-bottom:10px;">@paymentError</div>
+                }
+
+                <label class="apple-label" style="margin-top:0;">Скільки віддаємо? (ТІЛЬКИ В ДОЛАРАХ $)</label>
+                <input type="number" class="apple-input" style="font-weight:700; color:var(--apple-green); font-size:1.2rem;" @bind="paymentReq.Amount" />
+                <label class="apple-label">Коментар</label>
+                <input type="text" class="apple-input" @bind="paymentReq.Comment" placeholder="За товар..." />
+            </div>
+            <div class="ms-footer">
+                <button class="btn-apple outline" @onclick="() => showPaymentModal = false">Скасувати</button>
+                <button class="btn-apple success" @onclick="SubmitPayment" disabled="@isProcessing">
+                    @if (isProcessing)
+                    {
+                        <span class="spinner-border spinner-border-sm me-1"></span>
+                    }
+                    <i class="bi bi-wallet2"></i> Списати з каси
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+@* ОНОВЛЕНА МОДАЛКА: ПОСТАЧАЛЬНИК ПОВЕРТАЄ БОРГ НАМ *@
+@if (showReceivePaymentModal && selectedSupplier != null)
+{
+    <div class="modal-backdrop-apple" @onclick="() => showReceivePaymentModal = false">
+        <div class="modal-sheet" @onclick:stopPropagation>
+            <div class="ms-header">
+                <h3 class="ms-title">Отримання боргу: @selectedSupplier.Name</h3>
+                <button class="ms-close" @onclick="() => showReceivePaymentModal = false"><i class="bi bi-x"></i></button>
+            </div>
+            <div class="ms-body">
+                @if (receivePaymentReq.SaleId.HasValue)
+                {
+                    <div style="background:rgba(52,199,89,.1); padding:12px; border-radius:8px; border:1px solid rgba(52,199,89,.3); margin-bottom:10px;">
+                        <div style="font-size:12px; color:#1a7a35;">Оплата за конкретний чек/телефон. Залишок боргу:</div>
+                        <div style="font-size:20px; font-weight:700; color:var(--apple-green);">$@specificDebtTargetAmount.ToString("N2")</div>
+                    </div>
+                }
+                else
+                {
+                    <div style="background:rgba(52,199,89,.1); padding:12px; border-radius:8px; border:1px solid rgba(52,199,89,.3); margin-bottom:10px;">
+                        <div style="font-size:12px; color:#1a7a35;">Постачальник винен нам загалом:</div>
+                        <div style="font-size:20px; font-weight:700; color:var(--apple-green);">$@Math.Abs(selectedSupplier.Debt).ToString("N2")</div>
+                    </div>
+                }
+
+                @if (!string.IsNullOrEmpty(paymentError))
+                {
+                    <div style="color:var(--apple-red); font-size:13px; font-weight:600; margin-bottom:10px;">@paymentError</div>
+                }
+
+                <div style="display:flex; gap:10px; margin-bottom: 12px;">
+                    <div style="flex: 1;">
+                        <label class="apple-label" style="margin-top:0;">Сума оплати</label>
+                        <input type="number" class="apple-input" style="font-weight:700; font-size:1.2rem;" @bind="receivePaymentReq.Amount" />
+                    </div>
+                    <div style="flex: 1;">
+                        <label class="apple-label" style="margin-top:0;">Валюта оплати</label>
+                        <select class="apple-input" @bind="receivePaymentReq.Currency">
+                            <option value="USD">Долар ($)</option>
+                            <option value="Готівка">Готівка (₴)</option>
+                            <option value="EUR">Євро (€)</option>
+                            <option value="Картка">На карту</option>
+                        </select>
+                    </div>
+                </div>
+
+                @if (receivePaymentReq.Currency != "USD")
+                {
+                    <div style="padding: 10px; border: 1px dashed var(--apple-blue); border-radius: 8px; background: rgba(0,113,227,.05); margin-bottom: 12px;">
+                        <label class="apple-label" style="margin-top:0;">За яким курсом рахувати погашення боргу?</label>
+                        <div style="display: flex; gap: 10px; align-items: center;">
+                            <input type="number" class="apple-input" style="width: 100px;" @bind="receivePaymentReq.ExchangeRate" />
+                            <span style="font-size: 13px; color: var(--apple-sub);">Спишеться боргу: <b>$@(Math.Round(receivePaymentReq.Amount / (receivePaymentReq.ExchangeRate > 0 ? receivePaymentReq.ExchangeRate : 1), 2))</b></span>
+                        </div>
+                    </div>
+                }
+
+                <label class="apple-label">Коментар</label>
+                <input type="text" class="apple-input" @bind="receivePaymentReq.Comment" placeholder="Повернення коштів..." />
+            </div>
+            <div class="ms-footer">
+                <button class="btn-apple outline" @onclick="() => showReceivePaymentModal = false">Скасувати</button>
+                <button class="btn-apple primary" @onclick="SubmitReceivePayment" disabled="@isProcessing">
+                    @if (isProcessing)
+                    {
+                        <span class="spinner-border spinner-border-sm me-1"></span>
+                    }
+                    <i class="bi bi-box-arrow-in-down"></i> Покласти в касу
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+@* 🔥 ОНОВЛЕНА МОДАЛКА: МИ ВІДДАЄМО ТОВАР ПОСТАЧАЛЬНИКУ *@
+@if (showGiveDeviceModal && selectedSupplier != null)
+{
+    <div class="modal-backdrop-apple" @onclick="() => showGiveDeviceModal = false">
+        <div class="modal-sheet" @onclick:stopPropagation>
+            <div class="ms-header">
+                <h3 class="ms-title">Віддати товар: @selectedSupplier.Name</h3>
+                <button class="ms-close" @onclick="() => showGiveDeviceModal = false"><i class="bi bi-x"></i></button>
+            </div>
+            <div class="ms-body">
+
+                <label class="apple-label" style="margin-top:0;">Джерело продажу (для статистики)</label>
+                <div class="segment-control" style="margin-bottom: 16px; width: 100%;">
+                    <button class="segment-btn @(giveReq.Source == "Опт" ? "active" : "")" style="flex:1;" @onclick='() => giveReq.Source = "Опт"'>Опт</button>
+                    <button class="segment-btn @(giveReq.Source == "Offline" ? "active" : "")" style="flex:1;" @onclick='() => giveReq.Source = "Offline"'>Офлайн</button>
+                </div>
+
+                <div style="background:#fafafa; padding:12px; border-radius:8px; border:1px solid #d2d2d7; margin-bottom:16px;">
+                    <div style="font-size:12px; color:var(--apple-sub); margin-bottom:4px;">Поточний баланс (Борг):</div>
+                    @if (selectedSupplier.Debt > 0)
+                    {
+                        <div style="font-weight:700; color:var(--apple-red);">Ми винні: $@selectedSupplier.Debt.ToString("N2")</div>
+                    }
+                    else if (selectedSupplier.Debt < 0)
+                    {
+                        <div style="font-weight:700; color:var(--apple-green);">Він винен: $@Math.Abs(selectedSupplier.Debt).ToString("N2")</div>
+                    }
+                    else
+                    {
+                        <div style="font-weight:700;">$0.00</div>
+                    }
+                </div>
+
+                @if (!string.IsNullOrEmpty(paymentError))
+                {
+                    <div style="color:var(--apple-red); font-size:13px; font-weight:600; margin-bottom:10px;">@paymentError</div>
+                }
+
+                <div class="search-container mb-3">
+                    <label class="apple-label" style="margin-top:0;">Оберіть пристрій зі складу *</label>
+                    <input type="text" class="apple-input" placeholder="🔍 Введіть назву або IMEI..."
+                           value="@giveSearchTerm" @oninput="OnGiveSearchInput" @onfocus="() => isGiveDropdownOpen = true" autocomplete="off" />
+
+                    @if (isGiveDropdownOpen && giveReq.DeviceId == 0 && !string.IsNullOrWhiteSpace(giveSearchTerm))
+                    {
+                        <div class="autocomplete-dropdown">
+                            @{
+                                var filtered = GetFilteredDevices(giveSearchTerm);
+                            }
+                            @if (filtered.Any())
+                            {
+                                foreach (var d in filtered)
+                                {
+                                    <div class="ac-item" @onclick='() => SelectDeviceToGive(d)'>
+                                        <strong style="color:var(--apple-text); font-size: 14px;">@d.ModelName @d.Capacity @d.Color</strong>
+                                        <span style="color:#6e6e73; font-size:12px; font-family: monospace;">
+                                            IMEI: @d.Identifier
+                                            @if (isAdmin)
+                                            {
+                                                <text>| Закупка: $@d.PurchasePrice</text>
+                                            }
+                                        </span>
+                                    </div>
+                                }
+                            }
+                            else
+                            {
+                                <div class="ac-item text-muted">Нічого не знайдено</div>
+                            }
+                        </div>
+                    }
+
+                    @if (giveReq.DeviceId > 0)
+                    {
+                        <div style="padding: 10px; background: rgba(0,113,227,.1); border: 1px solid rgba(0,113,227,.3); border-radius: 8px; margin-top: 8px; display: flex; justify-content: space-between; align-items: center;">
+                            <div>
+                                <div style="font-weight: 600; color: var(--apple-text); font-size: 14px;">@giveSearchTerm</div>
+                            </div>
+                            <button style="border:none; background:transparent; color:var(--apple-sub); cursor:pointer;" @onclick='() => { giveReq.DeviceId = 0; giveSearchTerm = ""; }'><i class="bi bi-x-circle-fill"></i></button>
+                        </div>
+                    }
+                </div>
+
+                <div style="display:flex; gap:10px; margin-bottom: 12px;">
+                    <div style="flex:1;">
+                        <label class="apple-label">Домовлена ціна ($)</label>
+                        <input type="number" class="apple-input" @bind="giveReq.AgreedPriceUSD" />
+                    </div>
+                    <div style="flex:1;">
+                        <label class="apple-label">Він дає одразу</label>
+                        <input type="number" class="apple-input" @bind="giveReq.PaidNowAmount" />
+                    </div>
+                </div>
+
+                <div style="display:flex; gap:10px; margin-bottom: 12px;">
+                    <div style="flex:1;">
+                        <label class="apple-label" style="margin-top:0;">Валюта оплати</label>
+                        <select class="apple-input" @bind="giveReq.PaidNowCurrency">
+                            <option value="USD">Долар ($)</option>
+                            <option value="Готівка">Готівка (₴)</option>
+                            <option value="EUR">Євро (€)</option>
+                            <option value="Картка">На карту</option>
+                        </select>
+                    </div>
+                    @if (giveReq.PaidNowCurrency != "USD")
+                    {
+                        <div style="flex:1;">
+                            <label class="apple-label" style="margin-top:0;">Курс рахування</label>
+                            <input type="number" class="apple-input" @bind="giveReq.ExchangeRate" />
+                        </div>
+                    }
+                </div>
+
+                @if (giveReq.AgreedPriceUSD > 0)
+                {
+                    decimal paidNowUSD_calc = giveReq.PaidNowCurrency == "USD" ? giveReq.PaidNowAmount : Math.Round(giveReq.PaidNowAmount / (giveReq.ExchangeRate > 0 ? giveReq.ExchangeRate : 1), 2);
+                    decimal owesUs = giveReq.AgreedPriceUSD - paidNowUSD_calc;
+
+                    <div style="margin-top: 12px; font-size: 13px; color: var(--apple-sub);">
+                        Залишок: постачальник залишиться винен вам <strong style="color:var(--apple-text);">$@owesUs</strong> за цей телефон.<br />
+                        Ця сума відніметься від вашого загального боргу перед ним.
+                    </div>
+                }
+
+            </div>
+            <div class="ms-footer">
+                <button class="btn-apple outline" @onclick="() => showGiveDeviceModal = false">Скасувати</button>
+                <button class="btn-apple primary" @onclick="SubmitGiveDevice" disabled="@(giveReq.DeviceId == 0 || giveReq.AgreedPriceUSD <= 0 || isProcessing)">
+                    @if (isProcessing)
+                    {
+                        <span class="spinner-border spinner-border-sm me-1"></span>
+                    }
+                    <i class="bi bi-box-arrow-right"></i> Віддати товар
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+
+@code {
+    private bool isAdmin = false;
+    private string currentTab = "list";
+    private List<Supplier> suppliers = new();
+    private List<ConsignmentDebtDto> debts = new();
+    private List<PaidHistoryDto> paidHistory = new();
+    private List<Store> stores = new();
+    private bool isLoading = true;
+
+    private bool showSupplierModal = false;
+    private Supplier editingSupplier = new();
+
+    private bool showPaymentModal = false; // Ми платимо
+    private bool showReceivePaymentModal = false; // Нам платять
+    private bool showGiveDeviceModal = false; // Ми віддаємо товар
+
+    private bool showOutboundDebtsModal = false;
+    private bool isLoadingOutbound = false;
+    private List<OutboundDebtDto> outboundDebts = new();
+    private decimal specificDebtTargetAmount = 0;
+
+    private bool isProcessing = false;
+    private string paymentError = "";
+    private Supplier? selectedSupplier;
+
+    private PayDebtRequest paymentReq = new();
+    private ReceivePaymentRequest receivePaymentReq = new();
+    private GiveDeviceRequest giveReq = new();
+
+    private int currentStoreId = 0;
+    private HashSet<string> expandedHistory = new();
+
+    private List<DeviceView> availableDevices = new();
+    private string giveSearchTerm = "";
+    private bool isGiveDropdownOpen = false;
+
+    class ConsignmentDebtDto { public int DeviceId { get; set; } public string SupplierName { get; set; } = ""; public string ModelName { get; set; } = ""; public string Identifier { get; set; } = ""; public decimal PurchasePrice { get; set; } public decimal PaidAmount { get; set; } public decimal DebtUSD { get; set; } public bool IsSold { get; set; } }
+    class PaidHistoryDto { public int DeviceId { get; set; } public string SupplierName { get; set; } = ""; public string ModelName { get; set; } = ""; public string Identifier { get; set; } = ""; public decimal PurchasePrice { get; set; } public DateTime DateAdded { get; set; } }
+
+    // 🔥 Оновлена модель з PurchasePrice
+    class DeviceView { public int Id { get; set; } public string ModelName { get; set; } = ""; public string Capacity { get; set; } = ""; public string Color { get; set; } = ""; public string Identifier { get; set; } = ""; public int IsSold { get; set; } public decimal SellingPrice { get; set; } public decimal PurchasePrice { get; set; } }
+
+    // 🔥 Оновлена модель для списку боргів
+    class OutboundDebtDto { public int SaleId { get; set; } public DateTime Date { get; set; } public string ModelName { get; set; } = ""; public string Imei { get; set; } = ""; public decimal AgreedPriceUSD { get; set; } public decimal RemainingDebtUSD { get; set; } public bool IsFullyPaid { get; set; } public string Status { get; set; } = ""; }
+
+    public class PayDebtRequest { public int StoreId { get; set; } public decimal Amount { get; set; } public string Comment { get; set; } = ""; }
+    public class ReceivePaymentRequest { public int StoreId { get; set; } public decimal Amount { get; set; } public string Currency { get; set; } = "USD"; public decimal ExchangeRate { get; set; } = 41.5m; public string Comment { get; set; } = ""; public int? SaleId { get; set; } }
+    public class GiveDeviceRequest { public int StoreId { get; set; } public int DeviceId { get; set; } public decimal AgreedPriceUSD { get; set; } public decimal PaidNowAmount { get; set; } public string PaidNowCurrency { get; set; } = "USD"; public decimal ExchangeRate { get; set; } = 41.5m; public string Source { get; set; } = "Опт"; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+        isAdmin = user.IsInRole("Admin");
+
+        var storeClaim = user.FindFirst("StoreId");
+        if (storeClaim != null && int.TryParse(storeClaim.Value, out int sId)) currentStoreId = sId;
+
+        await LoadData();
+
+        try
+        {
+            stores = await Http.GetFromJsonAsync<List<Store>>("api/transfers/stores") ?? new();
+            if (currentStoreId == 0 && stores.Any()) currentStoreId = stores.First().Id;
+        }
+        catch { }
+    }
+
+    private async Task LoadData()
+    {
+        isLoading = true;
+        StateHasChanged();
+        try
+        {
+            suppliers = await Http.GetFromJsonAsync<List<Supplier>>("api/suppliers") ?? new();
+
+            if (isAdmin && currentTab == "debts") debts = await Http.GetFromJsonAsync<List<ConsignmentDebtDto>>("api/suppliers/consignment-debts") ?? new();
+            if (isAdmin && currentTab == "history") paidHistory = await Http.GetFromJsonAsync<List<PaidHistoryDto>>("api/suppliers/paid-history") ?? new();
+        }
+        catch { }
+        isLoading = false;
+        StateHasChanged();
+    }
+
+    private async Task LoadDebtsTab() { currentTab = "debts"; await LoadData(); }
+    private async Task LoadHistoryTab() { currentTab = "history"; expandedHistory.Clear(); await LoadData(); }
+
+    private void ToggleHistory(string supplierName)
+    {
+        if (expandedHistory.Contains(supplierName)) expandedHistory.Remove(supplierName);
+        else expandedHistory.Add(supplierName);
+    }
+
+    private void OpenSupplierModal(Supplier? s)
+    {
+        editingSupplier = s != null ? new Supplier { Id = s.Id, Name = s.Name, Phone = s.Phone, Notes = s.Notes, Debt = s.Debt } : new Supplier();
+        showSupplierModal = true;
+    }
+
+    private async Task SaveSupplier()
+    {
+        if (string.IsNullOrWhiteSpace(editingSupplier.Name)) return;
+        if (editingSupplier.Id == 0) await Http.PostAsJsonAsync("api/suppliers", editingSupplier);
+        else await Http.PutAsJsonAsync($"api/suppliers/{editingSupplier.Id}", editingSupplier);
+
+        showSupplierModal = false;
+        await LoadData();
+    }
+
+    private void OpenPaymentModal(Supplier s)
+    {
+        selectedSupplier = s;
+        paymentReq = new PayDebtRequest { StoreId = currentStoreId, Amount = s.Debt, Comment = "" };
+        paymentError = "";
+        showPaymentModal = true;
+    }
+
+    private async Task SubmitPayment()
+    {
+        if (paymentReq.StoreId == 0) { paymentError = "Магазин не визначено."; return; }
+        if (paymentReq.Amount <= 0) { paymentError = "Сума має бути > 0."; return; }
+
+        isProcessing = true; paymentError = "";
+        try
+        {
+            var res = await Http.PostAsJsonAsync($"api/suppliers/{selectedSupplier!.Id}/pay", paymentReq);
+            if (res.IsSuccessStatusCode)
+            {
+                await JS.InvokeVoidAsync("alert", "Оплату успішно списано з каси, борг розподілено по товарах!");
+                showPaymentModal = false;
+                await LoadData();
+            }
+            else { paymentError = await res.Content.ReadAsStringAsync(); }
+        }
+        catch (Exception ex) { paymentError = ex.Message; }
+        finally { isProcessing = false; }
+    }
+
+    private async Task OpenOutboundDebtsModal(Supplier s)
+    {
+        selectedSupplier = s;
+        showOutboundDebtsModal = true;
+        isLoadingOutbound = true;
+        outboundDebts.Clear();
+        StateHasChanged();
+
+        try
+        {
+            outboundDebts = await Http.GetFromJsonAsync<List<OutboundDebtDto>>($"api/suppliers/{s.Id}/outbound-debts") ?? new();
+        }
+        catch { }
+        finally { isLoadingOutbound = false; StateHasChanged(); }
+    }
+
+    private void OpenReceivePaymentModal(Supplier s, int? saleId, decimal? specificAmount)
+    {
+        selectedSupplier = s;
+        decimal storeRate = stores.FirstOrDefault(st => st.Id == currentStoreId)?.ExchangeRate ?? 41.5m;
+        specificDebtTargetAmount = specificAmount ?? Math.Abs(s.Debt);
+
+        receivePaymentReq = new ReceivePaymentRequest
+        {
+            StoreId = currentStoreId,
+            Amount = specificDebtTargetAmount,
+            Comment = "",
+            SaleId = saleId,
+            Currency = "USD",
+            ExchangeRate = storeRate
+        };
+        paymentError = "";
+        showReceivePaymentModal = true;
+    }
+
+    private async Task SubmitReceivePayment()
+    {
+        if (receivePaymentReq.Amount <= 0) { paymentError = "Сума має бути > 0."; return; }
+
+        isProcessing = true; paymentError = "";
+        try
+        {
+            var res = await Http.PostAsJsonAsync($"api/suppliers/{selectedSupplier!.Id}/receive-payment", receivePaymentReq);
+            if (res.IsSuccessStatusCode)
+            {
+                await JS.InvokeVoidAsync("alert", "Гроші успішно додано в касу!");
+                showReceivePaymentModal = false;
+
+                if (showOutboundDebtsModal)
+                {
+                    await OpenOutboundDebtsModal(selectedSupplier);
+                }
+
+                await LoadData();
+            }
+            else { paymentError = await res.Content.ReadAsStringAsync(); }
+        }
+        catch (Exception ex) { paymentError = ex.Message; }
+        finally { isProcessing = false; }
+    }
+
+    private async Task OpenGiveDeviceModal(Supplier s)
+    {
+        selectedSupplier = s;
+        decimal storeRate = stores.FirstOrDefault(st => st.Id == currentStoreId)?.ExchangeRate ?? 41.5m;
+
+        giveReq = new GiveDeviceRequest
+        {
+            StoreId = currentStoreId,
+            DeviceId = 0,
+            AgreedPriceUSD = 0,
+            PaidNowAmount = 0,
+            PaidNowCurrency = "USD",
+            ExchangeRate = storeRate,
+            Source = "Опт"
+        };
+        giveSearchTerm = "";
+        paymentError = "";
+
+        try { availableDevices = await Http.GetFromJsonAsync<List<DeviceView>>("api/inventory/devices") ?? new(); availableDevices = availableDevices.Where(d => d.IsSold == 0).ToList(); } catch { }
+        showGiveDeviceModal = true;
+    }
+
+    private void OnGiveSearchInput(ChangeEventArgs e)
+    {
+        giveSearchTerm = e.Value?.ToString() ?? "";
+        giveReq.DeviceId = 0;
+        isGiveDropdownOpen = true;
+    }
+
+    private List<DeviceView> GetFilteredDevices(string term)
+    {
+        var tokens = term.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        return availableDevices.Where(d => tokens.All(t => (d.ModelName ?? "").Contains(t, StringComparison.OrdinalIgnoreCase) || (d.Identifier ?? "").Contains(t, StringComparison.OrdinalIgnoreCase))).Take(10).ToList();
+    }
+
+    private void SelectDeviceToGive(DeviceView d)
+    {
+        giveReq.DeviceId = d.Id;
+        // 🔥 Менеджерам підставляється ціна продажу, Адмінам - ціна закупки
+        giveReq.AgreedPriceUSD = isAdmin ? d.PurchasePrice : d.SellingPrice;
+        giveSearchTerm = $"{d.ModelName} {d.Capacity} {d.Color} - {d.Identifier}";
+        isGiveDropdownOpen = false;
+    }
+
+    private async Task SubmitGiveDevice()
+    {
+        if (giveReq.DeviceId == 0) { paymentError = "Оберіть пристрій."; return; }
+        if (giveReq.AgreedPriceUSD <= 0) { paymentError = "Вкажіть ціну."; return; }
+
+        isProcessing = true; paymentError = "";
+        try
+        {
+            var res = await Http.PostAsJsonAsync($"api/suppliers/{selectedSupplier!.Id}/give-device", giveReq);
+            if (res.IsSuccessStatusCode)
+            {
+                await JS.InvokeVoidAsync("alert", "Товар успішно віддано, борг перераховано!");
+                showGiveDeviceModal = false; await LoadData();
+            }
+            else { paymentError = await res.Content.ReadAsStringAsync(); }
+        }
+        catch (Exception ex) { paymentError = ex.Message; }
+        finally { isProcessing = false; }
+    }
+
+    private async Task PayDeviceIndividual(int deviceId)
+    {
+        bool confirm = await JS.InvokeAsync<bool>("confirm", "Ви впевнені, що розрахувалися з постачальником САМЕ ЗА ЦЕЙ пристрій?");
+        if (!confirm) return;
+
+        var res = await Http.PostAsync($"api/suppliers/pay-supplier/{deviceId}", null);
+        if (res.IsSuccessStatusCode) { await LoadData(); }
+        else { await JS.InvokeVoidAsync("alert", "Помилка при закритті боргу за пристрій."); }
+    }
+}

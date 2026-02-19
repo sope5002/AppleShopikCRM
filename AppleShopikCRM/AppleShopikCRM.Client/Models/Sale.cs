@@ -17,8 +17,14 @@ namespace AppleShopikCRM.Client.Models
         public string? Comment { get; set; }
         public string UserId { get; set; } // Хто продав/оформив
 
+        // ТТН Нової Пошти (щоб зручно було відслідковувати)
+        public string? TrackingNumber { get; set; }
+
+        [ForeignKey(nameof(CustomerId))]
+        public Customer? Customer { get; set; }
         public List<SaleItem> SaleItems { get; set; } = new();
         public List<SalePayment> Payments { get; set; } = new();
+        public ICollection<CustomerWarranty> CustomerWarranties { get; set; } = new List<CustomerWarranty>();
 
     }
 

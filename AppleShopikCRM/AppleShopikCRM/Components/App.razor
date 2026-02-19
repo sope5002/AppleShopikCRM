@@ -14,14 +14,39 @@
     <link rel="stylesheet" href="AppleShopikCRM.styles.css" />
     <link rel="icon" type="image/png" href="favicon.png" />
     
+    @* 🔥 ДОДАЛИ РЕЖИМ І ВИМКНУЛИ ПРЕРЕНДЕР *@
     <HeadOutlet />
 </head>
 
 <body>
 
+    @* 🔥 ДОДАЛИ РЕЖИМ І ВИМКНУЛИ ПРЕРЕНДЕР *@
     <Routes />
+    
     <script src="_framework/blazor.web.js"></script>
 
 </body>
 
+            const iframe = document.createElement('iframe');
+            iframe.style.display = 'none';
+            iframe.src = blobUrl;
+            document.body.appendChild(iframe);
+
+            iframe.onload = function () {
+                setTimeout(function() {
+                    iframe.contentWindow.focus();
+                    iframe.contentWindow.print();
+
+                    setTimeout(() => {
+                        if (document.body.contains(iframe)) {
+                            document.body.removeChild(iframe);
+                        }
+                        URL.revokeObjectURL(blobUrl);
+                    }, 10000);
+                }, 500);
+            };
+        };
+    </script>
+    
+</body>
 </html>

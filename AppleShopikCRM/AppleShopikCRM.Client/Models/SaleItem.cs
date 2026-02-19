@@ -21,7 +21,14 @@ namespace AppleShopikCRM.Client.Models
         public decimal WarrantyPrice { get; set; }     // Дохід з гарантії
         public decimal PositionProfit { get; set; }    // Прибуток з цієї позиції
         public int? WarrantyId { get; set; }
+
+        public decimal PurchasePriceUSD { get; set; } // Фіксуємо закупку в $
+        public decimal SellingPriceUSD { get; set; }  // Ціна продажу, переведена в $ (Price / ExchangeRate)
+        public decimal ProfitUSD { get; set; }        // Чистий прибуток в $ (SellingPriceUSD - PurchasePriceUSD)
         public Sale? Sale { get; set; }
+
+        [ForeignKey("WarrantyId")]
+        public virtual WarrantyRate? WarrantyRate { get; set; }
 
     }
 }

@@ -5,6 +5,7 @@ using AppleShopikCRM.Server.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
 
@@ -19,6 +20,7 @@ namespace AppleShopikCRM.Server.Controllers
         private readonly PdfService _pdfService;
         private readonly StorageService _storageService;
         private readonly UserManager<ApplicationUser> _userManager;
+        private readonly IHubContext<ChatHub> _hubContext;
 
         public RepairsController(
             ApplicationDbContext context,
@@ -30,6 +32,7 @@ namespace AppleShopikCRM.Server.Controllers
             _pdfService = pdfService;
             _storageService = storageService;
             _userManager = userManager;
+            _hubContext = hubContext;
         }
 
         // 1. ОТРИМАТИ ВСІ ЗАЯВКИ
@@ -66,6 +69,54 @@ namespace AppleShopikCRM.Server.Controllers
 
             _context.RepairTickets.Add(ticket);
             await _context.SaveChangesAsync();
+            await _hubContext.Clients.All.SendAsync("RefreshRepairNotifications");
+            return Ok(ticket);
+        }
+
+        [HttpPut("save-details")]
+        public async Task<ActionResult> SaveDetails([FromBody] RepairTicket updatedTicket)
+        {
+            var dbTicket = await _context.RepairTickets
+                .Include(t => t.Items)
+                .FirstOrDefaultAsync(t => t.Id == updatedTicket.Id);
+
+            if (dbTicket == null) return NotFound("Заявку не знайдено");
+
+            dbTicket.ResolutionReport = updatedTicket.ResolutionReport;
+            dbTicket.CostPart = updatedTicket.CostPart;
+            dbTicket.Price = updatedTicket.Price;
+
+            // 🔥 ЗАВЖДИ ЗБЕРІГАЄМО ПРАВИЛЬНИЙ МАГАЗИН ПРИЗНАЧЕННЯ
+            dbTicket.TargetStoreId = updatedTicket.TargetStoreId > 0 ? updatedTicket.TargetStoreId : dbTicket.StoreId;
+
+            // 🔥 ЗБЕРЕЖЕННЯ ОПИСУ ПРОБЛЕМИ АДМІНОМ
+            if (!string.IsNullOrWhiteSpace(updatedTicket.IssueDescription))
+            {
+                dbTicket.IssueDescription = updatedTicket.IssueDescription;
+            }
+
+            if (!string.IsNullOrEmpty(updatedTicket.TechnicianId))
+            {
+                dbTicket.TechnicianId = updatedTicket.TechnicianId;
+            }
+
+            _context.RepairItems.RemoveRange(dbTicket.Items);
+
+            if (updatedTicket.Items != null && updatedTicket.Items.Any())
+            {
+                foreach (var item in updatedTicket.Items)
+                {
+                    dbTicket.Items.Add(new RepairItem
+                    {
+                        Name = item.Name,
+                        Cost = item.Cost,
+                        Price = item.Price
+                    });
+                }
+            }
+
+            await _context.SaveChangesAsync();
+            await _hubContext.Clients.All.SendAsync("RefreshRepairNotifications");
             return Ok();
         }
 
@@ -78,7 +129,9 @@ namespace AppleShopikCRM.Server.Controllers
 
             // 1. Оновлюємо основні поля
             dbTicket.Status = request.Status;
-            dbTicket.ResolutionReport = request.ResolutionReport;
+
+            if (!string.IsNullOrEmpty(request.ResolutionReport))
+                dbTicket.ResolutionReport = request.ResolutionReport;
             dbTicket.CostPart = request.CostPart;
             dbTicket.Price = request.Price;
 
@@ -99,13 +152,14 @@ namespace AppleShopikCRM.Server.Controllers
                     // Якщо ID не знайдено - залишаємо null (але не пишемо "Unknown"!)
                     // Це врятує від помилки 500
                     Console.WriteLine("⚠️ Увага: Не вдалося визначити ID майстра з токена.");
-                }
+            }
             }
 
             // 3. Зберігаємо
             try
             {
                 await _context.SaveChangesAsync();
+                await _hubContext.Clients.All.SendAsync("RefreshRepairNotifications");
                 return Ok();
             }
             catch (Exception ex)
@@ -137,8 +191,8 @@ namespace AppleShopikCRM.Server.Controllers
             try
             {
                 // 1. Знаходимо ремонт
-                var ticket = await _context.RepairTickets
-                    .Include(t => t.DeviceStock)
+            var ticket = await _context.RepairTickets
+                .Include(t => t.DeviceStock)
                     .FirstOrDefaultAsync(t => t.Id == request.TicketId);
 
                 if (ticket == null) return NotFound("Ремонт не знайдено");
@@ -149,7 +203,7 @@ namespace AppleShopikCRM.Server.Controllers
 
                 // 3. СТВОРЮЄМО ПРОДАЖ (SALE)
                 var sale = new Sale
-                {
+            {
                     StoreId = ticket.StoreId,
                     SaleDate = DateTime.Now,
                     UserId = userId,
@@ -169,7 +223,7 @@ namespace AppleShopikCRM.Server.Controllers
 
                 // 4. СТВОРЮЄМО ПОЗИЦІЮ ЧЕКУ (SALE ITEM)
                 var saleItem = new SaleItem
-                {
+            {
                     ItemType = "Service", // 👈 Важливе поле для розрізнення типів
                     ItemId = ticket.Id,  // ID тікета як ідентифікатор товару
 
@@ -199,14 +253,16 @@ namespace AppleShopikCRM.Server.Controllers
                 {
                     shift = new CashShift { StoreId = ticket.StoreId, ShiftDate = today };
                     _context.CashShifts.Add(shift);
-                    await _context.SaveChangesAsync();
-                }
+            await _context.SaveChangesAsync();
+            await _hubContext.Clients.All.SendAsync("RefreshRepairNotifications");
+            return Ok();
+        }
 
                 foreach (var pay in request.Payments)
                 {
                     // Додаємо оплату в чек
                     sale.Payments.Add(new SalePayment
-                    {
+        {
                         Method = pay.Method,
                         Amount = pay.Amount,
                         ExchangeRate = pay.ExchangeRate
@@ -217,7 +273,7 @@ namespace AppleShopikCRM.Server.Controllers
                     decimal amountInUah = pay.Amount * (pay.ExchangeRate > 0 ? pay.ExchangeRate : 1);
 
                     switch (pay.Method)
-                    {
+            {
                         case "USD": shift.IncomeUSD += pay.Amount; break;
                         case "EUR": shift.IncomeEUR += pay.Amount; break;
                         case "Картка":
@@ -227,7 +283,7 @@ namespace AppleShopikCRM.Server.Controllers
 
                     // Додаємо транзакцію в історію каси
                     _context.CashTransactions.Add(new CashTransaction
-                    {
+                {
                         StoreId = ticket.StoreId,
                         ShiftId = shift.Id,
                         //SaleId = sale.Id,
@@ -249,6 +305,7 @@ namespace AppleShopikCRM.Server.Controllers
 
                 await _context.SaveChangesAsync();
                 await transaction.CommitAsync();
+                await _hubContext.Clients.All.SendAsync("RefreshRepairNotifications");
 
                 // Повертаємо ID продажу для друку чеку
                 return Ok(new { SaleId = sale.Id });
@@ -279,8 +336,8 @@ namespace AppleShopikCRM.Server.Controllers
                 {
                     device.IsSold = 0; // Повертаємо у продаж
                     device.PurchasePrice += ticket.CostPart; // Збільшуємо собівартість на ціну запчастин
-                }
             }
+        }
 
             await _context.SaveChangesAsync();
             return Ok();
@@ -347,6 +404,40 @@ namespace AppleShopikCRM.Server.Controllers
 
             return stats;
         }
+
+        [HttpGet("print-blank/{id}")]
+        public async Task<IActionResult> PrintRepairBlank(int id)
+        {
+            var ticket = await _context.RepairTickets
+                .Include(t => t.DeviceStock)
+                .FirstOrDefaultAsync(t => t.Id == id);
+
+            if (ticket == null) return NotFound();
+
+            string fullDeviceName = ticket.DeviceStock != null
+                ? $"{ticket.DeviceStock.ModelName!} {ticket.DeviceStock.Capacity!} {ticket.DeviceStock.Color!}".Trim()
+                : ticket.DeviceModel!;
+
+            var user = await _userManager.GetUserAsync(User);
+            string fullSellerName = user?.FullName ?? user?.UserName ?? "Невідомий";
+            string shortSellerName = fullSellerName.Split(' ', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault() ?? fullSellerName;
+            var store = await _context.Stores.FindAsync(ticket.StoreId);
+
+            byte[] pdfBytes = _pdfService.GenerateRepairBlankPdf(
+                ticket,
+                shortSellerName,
+                store?.Name ?? "AppleShopik",
+                store?.Address ?? "",
+                store?.Phone ?? "",
+                store?.InstagramUrl ?? "",
+                fullDeviceName ?? ""
+            );
+
+            await _storageService.SaveRepairBlankAsync(pdfBytes, ticket.TicketNumber, store?.Name ?? "Main");
+
+            Response.Headers.Append("Content-Disposition", "inline; filename=repair_blank.pdf");
+            return File(pdfBytes, "application/pdf");
+        }
     }
 
     // DTO для статистики
@@ -365,6 +456,7 @@ namespace AppleShopikCRM.Server.Controllers
         public decimal CostPart { get; set; }
         public decimal Price { get; set; }
         public string? TechnicianId { get; set; }
+        public int? TargetStoreId { get; set; }
     }
 }
 

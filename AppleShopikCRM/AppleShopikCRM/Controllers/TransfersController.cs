@@ -1,6 +1,9 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using AppleShopikCRM.Client.Models;
+using AppleShopikCRM.Helpers;
+using Microsoft.AspNetCore.SignalR; // 🔥 ДОДАНО
+using AppleShopikCRM.Hubs;
 
 namespace AppleShopikCRM.Controllers
 {
@@ -9,10 +12,21 @@ namespace AppleShopikCRM.Controllers
     public class TransfersController : ControllerBase
     {
         private readonly ApplicationDbContext _context;
+        private readonly IHubContext<ChatHub> _hubContext; // 🔥 ДОДАНО
 
         public TransfersController(ApplicationDbContext context)
         {
             _context = context;
+            _hubContext = hubContext; // 🔥 ДОДАНО
+        }
+        [HttpGet("pending-notifications/{storeId}")]
+        public async Task<IActionResult> GetPendingNotifications(int storeId)
+        {
+            // Рахуємо запити на переміщення товару, де магазин є отримувачем і статус Pending
+            var count = await _context.TransferRequests
+                .CountAsync(t => t.ToStoreId == storeId && t.Status == "Pending");
+
+            return Ok(count);
         }
 
         // 1. ОТРИМАТИ ВСІ ЗАПИТИ (Активні)
@@ -69,6 +83,7 @@ namespace AppleShopikCRM.Controllers
 
             _context.TransferRequests.Add(req);
             await _context.SaveChangesAsync();
+            await _hubContext.Clients.Group($"Store_{req.ToStoreId}").SendAsync("RefreshInventoryNotifications");
             return Ok();
         }
 
@@ -135,6 +150,7 @@ namespace AppleShopikCRM.Controllers
             transfer.DateCompleted = DateTime.Now;
 
             await _context.SaveChangesAsync();
+            await _hubContext.Clients.Group($"Store_{transfer.ToStoreId}").SendAsync("RefreshInventoryNotifications");
             return Ok();
         }
 
@@ -143,6 +159,47 @@ namespace AppleShopikCRM.Controllers
         public async Task<ActionResult<IEnumerable<Store>>> GetStores()
         {
             return await _context.Stores.ToListAsync();
+        }
+        [HttpPost("cancel/{id}")]
+        public async Task<IActionResult> CancelTransfer(int id)
+        {
+            // Знайдіть вашу таблицю, можливо вона називається _context.TransferRequests
+            var transfer = await _context.TransferRequests.FindAsync(id);
+            if (transfer == null) return NotFound("Переміщення не знайдено");
+
+            if (transfer.Status != "Pending")
+                return BadRequest("Можна скасувати лише переміщення, які очікують підтвердження.");
+
+            // 1. Якщо це унікальний пристрій (телефон)
+            if (transfer.DeviceStockId.HasValue)
+            {
+                var device = await _context.DeviceStock.FindAsync(transfer.DeviceStockId.Value);
+                if (device != null)
+                {
+                    // Повертаємо телефон на магазин-відправник і знімаємо статус "В дорозі/Продано"
+                    device.StoreId = transfer.FromStoreId;
+                    device.IsSold = 0;
+                }
+            }
+            // 2. Якщо це аксесуар
+            else
+            {
+                var accStock = await _context.AccessoryStock
+                    .FirstOrDefaultAsync(a => a.ProductId == transfer.ProductId && a.StoreId == transfer.FromStoreId);
+
+                if (accStock != null)
+                {
+                    // Повертаємо кількість назад
+                    accStock.Quantity += transfer.Quantity;
+                }
+            }
+
+            // 3. Скасовуємо переміщення (або можете зробити _context.TransferRequests.Remove(transfer);)
+            transfer.Status = "Cancelled";
+
+            await _context.SaveChangesAsync();
+            await _hubContext.Clients.Group($"Store_{transfer.ToStoreId}").SendAsync("RefreshInventoryNotifications");
+            return Ok();
         }
     }
 }

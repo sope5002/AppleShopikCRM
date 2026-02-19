@@ -22,6 +22,10 @@ namespace AppleShopikCRM.Client.Models
         [NotMapped] public string FromStoreName { get; set; } = "";
         [NotMapped] public string ToStoreName { get; set; } = "";
         [NotMapped] public string Identifier { get; set; } = ""; // IMEI
+        [NotMapped] public string? Color { get; set; }
+        [NotMapped] public string? Capacity { get; set; }
+        [NotMapped] public string? ConditionStatus { get; set; }
+        [NotMapped] public int BatteryHealth { get; set; }
     }
 }
 

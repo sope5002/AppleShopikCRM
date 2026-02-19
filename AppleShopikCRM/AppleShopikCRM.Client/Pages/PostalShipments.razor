@@ -1,0 +1,480 @@
+﻿@page "/postal-shipments"
+@using AppleShopikCRM.Client.Components
+@using AppleShopikCRM.Client.Models
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@using System.Net.Http.Json
+
+@rendermode @(new InteractiveWebAssemblyRenderMode(prerender: false))
+@inject NavigationManager Nav
+@inject AuthenticationStateProvider AuthStateProvider
+@inject Blazored.LocalStorage.ILocalStorageService LocalStorage
+@inject HttpClient Http
+@inject IJSRuntime JS
+
+<PageTitle>Відправки — Apple Shopik</PageTitle>
+
+<style>
+    /* Стилі вкладок та модалки */
+    .ios-segment-control {
+        display: inline-flex;
+        background-color: #f1f2f6;
+        padding: 4px;
+        border-radius: 12px;
+        margin-bottom: 24px;
+        gap: 4px;
+    }
+
+    .ios-segment-btn {
+        padding: 8px 16px;
+        border-radius: 8px;
+        font-weight: 600;
+        font-size: 14px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        border: none;
+        background: transparent;
+        color: #8e8e93;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+        .ios-segment-btn:hover:not(.active) {
+            background-color: #e5e5ea;
+            color: #1c1c1e;
+        }
+
+        .ios-segment-btn.active {
+            background-color: #007aff;
+            color: white;
+            box-shadow: 0 2px 8px rgba(0, 122, 255, 0.3);
+        }
+
+    .modal-backdrop-custom {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        background: rgba(0,0,0,0.5);
+        z-index: 1040;
+        backdrop-filter: blur(3px);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .modal-custom {
+        background: white;
+        border-radius: 16px;
+        width: 90%;
+        max-width: 500px;
+        max-height: 90vh;
+        overflow-y: auto;
+        padding: 20px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+
+    @@keyframes popIn {
+        from {
+            transform: scale(0.9);
+            opacity: 0;
+        }
+
+        to {
+            transform: scale(1);
+            opacity: 1;
+        }
+    }
+
+    /* 🔥 Стилі для вибору магазину (взяті з вашого Sales.razor) */
+    .store-picker {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        background: #fff;
+        border: 1.5px solid var(--bs-primary);
+        border-radius: 20px;
+        padding: 4px 10px 4px 8px;
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--bs-primary);
+        cursor: pointer;
+        transition: box-shadow .15s;
+    }
+
+        .store-picker select {
+            border: none;
+            outline: none;
+            background: transparent;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--bs-primary);
+            cursor: pointer;
+            padding: 0;
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            appearance: none;
+        }
+</style>
+
+<div class="p-4">
+    @* 🔥 ЗАГОЛОВОК + ФІЛЬТР МАГАЗИНІВ *@
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="mb-0"><i class="bi bi-truck me-2 text-primary"></i>Посилки поштою</h2>
+
+        @if (isAdmin)
+        {
+            <div class="store-picker">
+                <i class="bi bi-building" style="font-size:13px;"></i>
+                <select value="@currentStoreId" @onchange="OnStoreChanged">
+                    <option value="0">Всі магазини</option>
+                    @foreach (var s in stores)
+                    {
+                        <option value="@s.Id">@s.Name</option>
+                    }
+                </select>
+                <i class="bi bi-chevron-down ms-1" style="font-size:10px;"></i>
+            </div>
+        }
+    </div>
+
+    <div class="ios-segment-control">
+        <button class="ios-segment-btn @(currentTab == "active" ? "active" : "")" @onclick='() => ChangeTab("active")'>
+            <i class="bi bi-box-seam"></i> В дорозі
+        </button>
+        <button class="ios-segment-btn @(currentTab == "completed" ? "active" : "")" @onclick='() => ChangeTab("completed")'>
+            <i class="bi bi-check-circle"></i> Забрали
+        </button>
+        <button class="ios-segment-btn @(currentTab == "returned" ? "active" : "")" @onclick='() => ChangeTab("returned")'>
+            <i class="bi bi-arrow-return-left"></i> Відмови
+        </button>
+    </div>
+
+    @if (isLoading)
+    {
+        <div class="spinner-border text-primary"></div>
+    }
+    else if (!shipments.Any())
+    {
+        <div class="alert alert-light text-center" style="border-radius: 16px;">
+            <i class="bi bi-folder2-open fs-1 text-muted"></i>
+            <p class="mt-2 mb-0 fw-bold">Список порожній.</p>
+        </div>
+    }
+    else
+    {
+        <div class="row">
+            @foreach (var sale in shipments)
+            {
+                <div class="col-md-6 col-lg-4 mb-3">
+                    <div class="card shadow-sm h-100" style="border-radius: 15px; border-left: 5px solid @GetBorderColor(sale.Status);">
+                        <div class="card-body d-flex flex-column">
+
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                @GetStatusBadge(sale.Status)
+                                <span class="text-muted small">@sale.SaleDate.ToString("dd.MM.yyyy HH:mm")</span>
+                            </div>
+
+                            <div class="d-flex justify-content-between align-items-start mb-1">
+                                <h5 class="card-title fw-bold mb-0">Чек №@sale.Id</h5>
+                                <div class="d-flex gap-1">
+                                    <button class="btn btn-sm btn-light text-primary border" title="Деталі чеку" @onclick="() => OpenDetails(sale.Id)">
+                                        <i class="bi bi-eye"></i>
+                                    </button>
+                                    <button class="btn btn-sm btn-light text-dark border" title="Завантажити PDF" @onclick="() => DownloadPdf(sale.Id)">
+                                        <i class="bi bi-printer"></i>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div class="text-muted small mb-3">
+                                👤 @(sale.CustomerName ?? "Невідомий клієнт")<br />
+
+                                <div class="mt-1 d-flex align-items-center">
+                                    <span>📍 ТТН: </span>
+                                    @if (editingTrackingId == sale.Id)
+                                    {
+                                        <div class="input-group input-group-sm ms-2" style="max-width: 200px;">
+                                            <input type="text" class="form-control" @bind="newTrackingNumber" placeholder="Новий ТТН..." />
+                                            <button class="btn btn-success" @onclick="() => SaveTracking(sale)">
+                                                <i class="bi bi-check-lg"></i>
+                                            </button>
+                                            <button class="btn btn-outline-secondary" @onclick="CancelEditTracking">
+                                                <i class="bi bi-x-lg"></i>
+                                            </button>
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        <strong class="text-dark ms-1">@(string.IsNullOrEmpty(sale.TrackingNumber) ? "Не вказано" : sale.TrackingNumber)</strong>
+                                        <button class="btn btn-sm btn-link text-primary p-0 ms-2" title="Змінити ТТН" @onclick="() => StartEditTracking(sale)">
+                                            <i class="bi bi-pencil-square"></i>
+                                        </button>
+                                    }
+                                </div>
+                            </div>
+
+                            <div class="mb-3 p-2" style="background: rgba(0,0,0,0.03); border-radius: 8px; font-size: 13px;">
+                                @foreach (var item in sale.Items)
+                                {
+                                    <div style="line-height: 1.4; margin-bottom: 6px;">
+                                        <i class="bi bi-dot text-secondary"></i>@item
+                                    </div>
+                                }
+                            </div>
+
+                            <div class="mt-auto">
+                                <h6 class="fw-bold text-success mb-3">@sale.FinalAmount.ToString("N0") грн</h6>
+
+                                @if (sale.Status == "Shipped")
+                                {
+                                    <div class="d-flex gap-2">
+                                        <button class="btn btn-sm btn-success w-50" style="border-radius: 8px;" @onclick="() => ConfirmDelivery(sale)">
+                                            <i class="bi bi-check-circle"></i> Забрали
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-danger w-50" style="border-radius: 8px;" @onclick="() => ReturnSale(sale)">
+                                            <i class="bi bi-arrow-return-left"></i> Відмова
+                                        </button>
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@* Модальне вікно деталей чеку *@
+@if (isDetailsModalOpen && detailsData != null)
+{
+    <div class="modal-backdrop-custom" @onclick="CloseDetails">
+        <div class="modal-custom" @onclick:stopPropagation="true">
+            <div class="d-flex justify-content-between align-items-center border-bottom pb-2 mb-3">
+                <h5 class="fw-bold mb-0">Деталі чека №@detailsData.Sale.Id</h5>
+                <button class="btn-close" @onclick="CloseDetails"></button>
+            </div>
+
+            <div class="mb-3 small text-muted">
+                <strong>Касир:</strong> @detailsData.SellerName <br />
+                <strong>Дата:</strong> @detailsData.Sale.SaleDate.ToString("dd.MM.yyyy HH:mm")
+            </div>
+
+            <div class="table-responsive mb-3">
+                <table class="table table-sm table-borderless align-middle" style="font-size: 14px;">
+                    <thead class="border-bottom">
+                        <tr class="text-muted">
+                            <th>Назва</th>
+                            <th class="text-center">К-ть</th>
+                            <th class="text-end">Сума</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var item in detailsData.Sale.SaleItems)
+                        {
+                            <tr>
+                                <td>
+                                    <div class="fw-bold">@item.ProductName</div>
+                                    @if (!string.IsNullOrEmpty(item.Identifier))
+                                    {
+                                        <div class="text-muted" style="font-size: 11px;">SN: @item.Identifier</div>
+                                    }
+                                </td>
+                                <td class="text-center">@item.Quantity</td>
+                                <td class="text-end fw-semibold">@item.SoldSellingPrice.ToString("N0") ₴</td>
+                            </tr>
+                            @if (item.WarrantyPrice > 0)
+                            {
+                                <tr>
+                                    <td colspan="2" class="text-muted ps-3">↳ 🛡 Гарантія (@item.WarrantyRate?.TermMonths міс.)</td>
+                                    <td class="text-end text-muted">@item.WarrantyPrice.ToString("N0") ₴</td>
+                                </tr>
+                            }
+                        }
+                    </tbody>
+                </table>
+            </div>
+
+            @if (detailsData.GlobalDiscount > 0)
+            {
+                <div class="d-flex justify-content-between text-danger fw-bold mb-2 px-2">
+                    <span>Знижка:</span>
+                    <span>- @detailsData.GlobalDiscount.ToString("N0") ₴</span>
+                </div>
+            }
+
+            <div class="d-flex justify-content-between bg-light p-3 rounded-3 mt-2">
+                <span class="fs-5 fw-bold text-dark">До сплати:</span>
+                <span class="fs-5 fw-bold text-success">@detailsData.Sale.FinalAmount.ToString("N0") ₴</span>
+            </div>
+
+            <button class="btn btn-primary w-100 mt-3" style="border-radius: 10px;" @onclick="() => DownloadPdf(detailsData.Sale.Id)">
+                <i class="bi bi-printer me-2"></i>Друкувати чек
+            </button>
+        </div>
+    </div>
+}
+
+@code {
+    private List<PostalShipmentDto> shipments = new();
+    private bool isLoading = true;
+    private string currentTab = "active";
+
+    // 🔥 Змінні для фільтрації магазинів
+    private bool isAdmin = false;
+    private int currentStoreId = 0;
+    private List<Store> stores = new();
+
+    private int editingTrackingId = 0;
+    private string newTrackingNumber = "";
+
+    private bool isDetailsModalOpen = false;
+    private SaleReceiptDto? detailsData = null;
+
+    // Клас Store для десеріалізації (можете видалити, якщо він у вас підтягується з Global Usings)
+    public class Store { public int Id { get; set; } public string Name { get; set; } = ""; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+        isAdmin = user.IsInRole("Admin");
+
+        if (int.TryParse(user.FindFirst("StoreId")?.Value, out int sId))
+        {
+            currentStoreId = sId;
+        }
+
+        if (isAdmin)
+        {
+            currentStoreId = 0; // Адмін за замовчуванням бачить всі
+            try
+            {
+                await SetAuthHeader();
+                stores = await Http.GetFromJsonAsync<List<Store>>("api/transfers/stores") ?? new();
+            }
+            catch { }
+        }
+
+        await LoadShipments();
+    }
+
+    private async Task OnStoreChanged(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out int id))
+        {
+            currentStoreId = id;
+            await LoadShipments();
+        }
+    }
+
+    private async Task ChangeTab(string tab)
+    {
+        if (currentTab == tab) return;
+        currentTab = tab;
+        await LoadShipments();
+    }
+
+    private async Task SetAuthHeader()
+    {
+        var token = await LocalStorage.GetItemAsync<string>("authToken");
+        if (!string.IsNullOrEmpty(token))
+        {
+            Http.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+        }
+    }
+
+    private async Task LoadShipments()
+    {
+        isLoading = true;
+        try
+        {
+            await SetAuthHeader();
+            // 🔥 Передаємо storeId в запит
+            shipments = await Http.GetFromJsonAsync<List<PostalShipmentDto>>($"api/sales/shipments?tab={currentTab}&storeId={currentStoreId}") ?? new();
+        }
+        catch (Exception ex) { Console.WriteLine($"Помилка: {ex.Message}"); }
+        finally { isLoading = false; }
+    }
+
+    // ==========================================
+    // МЕТОДИ ДЛЯ ПЕРЕГЛЯДУ ТА ДРУКУ ЧЕКА
+    // ==========================================
+    private async Task OpenDetails(int id)
+    {
+        try
+        {
+            await SetAuthHeader();
+            detailsData = await Http.GetFromJsonAsync<SaleReceiptDto>($"api/sales/{id}");
+            isDetailsModalOpen = true;
+        }
+        catch (Exception ex) { await JS.InvokeVoidAsync("alert", "Не вдалося завантажити деталі чека."); }
+    }
+
+    private void CloseDetails() { isDetailsModalOpen = false; detailsData = null; }
+
+    private async Task DownloadPdf(int id)
+    {
+        try
+        {
+            await SetAuthHeader();
+            var response = await Http.GetAsync($"api/sales/download-pdf/{id}");
+            if (response.IsSuccessStatusCode)
+            {
+                var fileBytes = await response.Content.ReadAsByteArrayAsync();
+                var base64 = Convert.ToBase64String(fileBytes);
+                await JS.InvokeVoidAsync("eval", $@"
+                    var link = document.createElement('a');
+                    link.href = 'data:application/pdf;base64,{base64}';
+                    link.download = 'Receipt_{id}.pdf';
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                ");
+            }
+            else { await JS.InvokeVoidAsync("alert", "Помилка при генерації PDF."); }
+        }
+        catch (Exception ex) { await JS.InvokeVoidAsync("alert", "Помилка: " + ex.Message); }
+    }
+
+    // ==========================================
+    // РЕДАГУВАННЯ ТТН ТА ЗМІНА СТАТУСІВ
+    // ==========================================
+    private void StartEditTracking(PostalShipmentDto sale) { editingTrackingId = sale.Id; newTrackingNumber = sale.TrackingNumber ?? ""; }
+    private void CancelEditTracking() { editingTrackingId = 0; newTrackingNumber = ""; }
+
+    private async Task SaveTracking(PostalShipmentDto sale)
+    {
+        if (string.IsNullOrWhiteSpace(newTrackingNumber)) return;
+        var response = await Http.PostAsJsonAsync($"api/sales/{sale.Id}/update-tracking", new { TrackingNumber = newTrackingNumber });
+        if (response.IsSuccessStatusCode) { sale.TrackingNumber = newTrackingNumber; editingTrackingId = 0; StateHasChanged(); }
+    }
+
+    private async Task ConfirmDelivery(PostalShipmentDto sale)
+    {
+        bool confirm = await JS.InvokeAsync<bool>("confirm", $"Підтвердити, що клієнт забрав посилку (Чек №{sale.Id})?");
+        if (!confirm) return;
+        var response = await Http.PostAsync($"api/sales/{sale.Id}/confirm-delivery", null);
+        if (response.IsSuccessStatusCode) await LoadShipments();
+    }
+
+    private async Task ReturnSale(PostalShipmentDto sale)
+    {
+        bool confirm = await JS.InvokeAsync<bool>("confirm", "УВАГА! Продаж буде скасовано, а прибутки обнулено. Товари повернуться на баланс. Продовжити?");
+        if (!confirm) return;
+        var response = await Http.PostAsync($"api/sales/{sale.Id}/return", null);
+        if (response.IsSuccessStatusCode) await LoadShipments();
+    }
+
+    private string GetBorderColor(string? status) => status switch { "Completed" => "#34c759", "Returned" => "#ff3b30", _ => "#007aff" };
+    private RenderFragment GetStatusBadge(string? status) => builder =>
+    {
+        if (status == "Completed") { builder.OpenElement(0, "span"); builder.AddAttribute(1, "class", "badge bg-success"); builder.AddContent(2, "✅ Забрали"); builder.CloseElement(); }
+        else if (status == "Returned") { builder.OpenElement(0, "span"); builder.AddAttribute(1, "class", "badge bg-danger"); builder.AddContent(2, "❌ Відмова"); builder.CloseElement(); }
+        else { builder.OpenElement(0, "span"); builder.AddAttribute(1, "class", "badge bg-primary"); builder.AddContent(2, "🚚 В дорозі"); builder.CloseElement(); }
+    };
+}

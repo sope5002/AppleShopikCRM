@@ -1,4 +1,5 @@
-﻿using FluentFTP;
+﻿using AppleShopikCRM.Helpers;
+using FluentFTP;
 using Microsoft.Extensions.Options;
 
 namespace AppleShopikCRM.Server.Services
@@ -37,8 +38,12 @@ namespace AppleShopikCRM.Server.Services
                 var ftpPass = _config["FtpSettings:Password"];
 
                 // З'єднуємося
-                using var ftp = new AsyncFtpClient(ftpHost, ftpUser, ftpPass);
-                await ftp.AutoConnect();
+                    using var ftp = new AsyncFtpClient(ftpHost, ftpUser, ftpPass);
+
+                    // 🔥 ДОДАНО: Для SmarterASP.NET пасивний режим обов'язковий!
+                    ftp.Config.DataConnectionType = FtpDataConnectionType.AutoPassive;
+
+                    await ftp.AutoConnect();
 
                 // Завантажуємо
                 // remotePath буде: /shopName/filename.pdf
@@ -46,12 +51,13 @@ namespace AppleShopikCRM.Server.Services
 
                 // Перевіряємо чи є папка магазину на FTP
                 if (!await ftp.DirectoryExists($"/{shopName}"))
-                {
+                    {
                     await ftp.CreateDirectory($"/{shopName}");
-                }
+                    }
 
                 await ftp.UploadBytes(fileData, remotePath);
-                await ftp.Disconnect();
+                    await ftp.Disconnect();
+                }
             }
             catch (Exception ex)
             {

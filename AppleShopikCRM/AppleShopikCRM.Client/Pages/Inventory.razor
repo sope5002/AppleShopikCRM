@@ -22,11 +22,14 @@
                         style="width: 200px;"
                         @bind="currentStoreId"
                         @after="LoadTabData">
-                    @foreach (var s in stores)
-                    {
+                        @foreach (var s in stores)
+                        {
                         <option value="@s.Id">📍 @s.Name</option>
-                    }
-                </select>
+                        }
+                    </select>
+                    <i class="bi bi-chevron-down" style="font-size:10px;"></i>
+                </div>
+                <span class="tag" style="background:#1d1d1f;color:#fff;border:none;">Адмін</span>
             }
             else
             {
@@ -36,13 +39,14 @@
                 </div>
             }
         </div>
+    </div>
 
         @* ІНФОРМАЦІЯ ПРО КОРИСТУВАЧА *@
         <div class="d-flex align-items-center gap-2">
             <span class="badge @(isAdmin ? "bg-dark" : "bg-success")">
                 @(isAdmin ? "Admin View" : "Manager View")
             </span>
-        </div>
+    </div>
     </div>
 
     @* --- ВКЛАДКИ --- *@
@@ -63,14 +67,14 @@
     @* ============================================== *@
     @* ВМІСТ: ПРИСТРОЇ (Devices)                      *@
     @* ============================================== *@
-    @if (activeTab == "devices")
-    {
+            @if (activeTab == "devices")
+            {
         // Фільтруємо пристрої тільки поточного магазину
         var myDevices = devices?.Where(d => d.StoreId == currentStoreId).ToList() ?? new();
 
         @* 1. ФІНАНСИ (Тільки Адмін) *@
-        @if (isAdmin)
-        {
+    @if (isAdmin)
+    {
             var invested = myDevices.Sum(d => d.PurchasePrice);
             var expected = myDevices.Sum(d => d.SellingPrice);
 
@@ -80,19 +84,23 @@
                         <div class="card-body">
                             <small class="opacity-75">Вкладено (Цей магазин)</small>
                             <h3 class="fw-bold">@invested.ToString("N0") грн</h3>
-                        </div>
                     </div>
                 </div>
+            </div>
                 <div class="col-md-6">
                     <div class="card bg-success text-white shadow-sm border-0">
                         <div class="card-body">
                             <small class="opacity-75">Потенційний прибуток</small>
                             <h3 class="fw-bold">@((expected - invested).ToString("N0")) грн</h3>
-                        </div>
-                    </div>
+                </div>
+                <div class="fin-box-mini green">
+                    <div class="fin-label">Потенційний прибуток</div>
+                    <div class="fin-val">@potentialProfitAccUAH.ToString("N0") <small>грн</small></div>
                 </div>
             </div>
+            </div>
         }
+    }
 
         @* 2. ТАБЛИЦЯ *@
         <div class="d-flex justify-content-end mb-3">
@@ -100,17 +108,17 @@
         </div>
 
         if (devices == null)
-        {
+    {
 
             <div class="text-center py-5"><div class="spinner-border text-primary"></div></div>
-        }
+            }
         else if (!myDevices.Any())
-        {
+            {
 
             <div class="alert alert-info text-center">Склад порожній у цьому магазині.</div>
-        }
-        else
-        {
+            }
+            else
+            {
             <div class="card shadow-sm border-0">
                 <table class="table table-hover mb-0 align-middle">
                     <thead class="table-light">
@@ -119,16 +127,16 @@
                             <th>IMEI / SN</th>
                             <th>Стан / АКБ</th>
                             <th>Ціна продажу</th>
-                            @if (isAdmin)
-                            {
+                                @if (isAdmin)
+                                {
                                 <th>Закупка</th>
-                            }
+                                        }
                             <th class="text-end pe-4">Дії</th>
                         </tr>
                     </thead>
                     <tbody>
                         @foreach (var dev in myDevices)
-                        {
+                    {
                             <tr>
                                 <td class="ps-4 fw-bold">@dev.ModelName <div class="small text-muted">@dev.Color, @dev.Capacity</div></td>
                                 <td><span class="font-monospace bg-light px-2 rounded border">@dev.Identifier</span></td>
@@ -137,10 +145,10 @@
                                     <small class="ms-1 text-muted">🔋 @dev.BatteryHealth%</small>
                                 </td>
                                 <td class="text-success fw-bold">$@dev.SellingPrice</td>
-                                @if (isAdmin)
-                                {
+                                    @if (isAdmin)
+                                    {
                                     <td class="text-muted">$@dev.PurchasePrice</td>
-                                }
+                                            }
                                 <td class="text-end pe-4">
                                     <button class="btn btn-sm btn-outline-warning" title="Перемістити на інший магазин"
                                             @onclick="() => OpenTransferModal(dev)">
@@ -151,20 +159,20 @@
                         }
                     </tbody>
                 </table>
-            </div>
+                </div>
+            }
         }
-    }
 
     @* ============================================== *@
     @* ВМІСТ: АКСЕСУАРИ (Accessories)                 *@
     @* ============================================== *@
-    @if (activeTab == "accessories")
-    {
+        @if (activeTab == "accessories")
+        {
         var myAccs = accessoriesList?.Where(a => a.StoreId == currentStoreId).ToList() ?? new();
 
         @* 1. ФІНАНСИ (Тільки Адмін) *@
-        @if (isAdmin)
-        {
+                                    @if (isAdmin)
+                                    {
             var invested = myAccs.Sum(a => a.Quantity * a.PurchasePrice);
             var expected = myAccs.Sum(a => a.Quantity * a.SellingPrice);
 
@@ -174,100 +182,286 @@
                         <div class="card-body">
                             <small class="opacity-75">Вкладено (Аксесуари)</small>
                             <h3 class="fw-bold">@invested.ToString("N0") грн</h3>
-                        </div>
-                    </div>
-                </div>
+                                </div>
+                            </div>
+                            <div class="prod-action">
+                                <div class="prod-price">@item.SellingPrice.ToString("N0") <span style="font-size:11px;font-weight:400;">грн</span></div>
+                                @if (isAdmin)
+                                {
+                                    <div class="prod-cost">закуп @item.PurchasePrice.ToString("N0") грн</div>
+                                }
+                            </div>
                 <div class="col-md-6">
                     <div class="card bg-info text-white shadow-sm border-0">
                         <div class="card-body">
                             <small class="opacity-75">Потенційний прибуток</small>
                             <h3 class="fw-bold">@((expected - invested).ToString("N0")) грн</h3>
+                            </div>
                         </div>
-                    </div>
+                    </Virtualize>
                 </div>
-            </div>
+            }
         }
+
+        @if (activeTab == "transfers")
+        {
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                @* ⬇️ ВХІДНІ *@
+                <div class="apple-card" style="border-top: 4px solid var(--apple-orange); padding: 20px;">
+                    <h4 style="font-size:16px;font-weight:700;margin-top:0;display:flex;justify-content:space-between;">
+                        <span>⬇️ Очікують підтвердження</span>
+                        <span class="tag yellow">@incomingTransfers.Count()</span>
+                    </h4>
+                    <hr style="border-color:var(--apple-border);margin:12px -20px 16px;" />
+
+                    @if (!incomingTransfers.Any())
+                    {
+                        <div class="text-muted text-center py-4" style="font-size: 13px;">Немає нових надходжень.</div>
+                    }
+                    else
+                    {
+                        <div style="display:flex; flex-direction:column; gap:12px;">
+                            @foreach (var t in incomingTransfers)
+                            {
+                                <div style="padding:14px; background:var(--apple-gray); border-radius:12px; border:1px solid var(--apple-border);">
+                                    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px;">
+                                        <div style="font-weight:700;font-size:15px;color:var(--apple-text);">
+                                            @($"{t.ModelName} {t.Capacity} {t.Color}".Trim())
+                                        </div>
+                                        <div style="font-size:11px;color:var(--apple-sub); text-align:right;">
+                                            Від: <br /><strong>@t.FromStoreName</strong>
+                                        </div>
+                                    </div>
+
+                                    <div style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:12px;">
+                                        @if (!string.IsNullOrEmpty(t.Identifier))
+                                        {
+                                            <span class="tag" style="font-family:monospace;"><i class="bi bi-upc-scan"></i> @t.Identifier</span>
+                                        }
+                                        @if (!string.IsNullOrEmpty(t.ConditionStatus))
+                                        {
+                                            <span class="tag @(t.ConditionStatus == "New" ? "green" : "yellow")">@t.ConditionStatus</span>
+                                        }
+                                        @if (t.BatteryHealth > 0)
+                                        {
+                                            <span class="tag @(t.BatteryHealth < 80 ? "red" : "green")">🔋 @t.BatteryHealth%</span>
+                                        }
+                                        <span class="tag blue">К-сть: @t.Quantity шт.</span>
+                                    </div>
 
         @* 2. ТАБЛИЦЯ *@
         <div class="d-flex justify-content-end mb-3 gap-2">
             @* Нова кнопка *@
             <button class="btn btn-outline-success shadow-sm" @onclick="() => showNewProductModal = true">
                 <i class="bi bi-plus-circle me-2"></i>Створити товар
-            </button>
+                                        </button>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    }
+                </div>
 
             @* Стара кнопка *@
             <button class="btn btn-success shadow-sm" @onclick="OpenRestockModal">
                 <i class="bi bi-box-seam-fill me-2"></i>Поповнити склад
-            </button>
-        </div>
+                                        </button>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    }
+                </div>
+            </div>
+        }
 
         if (accessoriesList == null)
         {
+            <div class="apple-card p-0">
+                @if (restockHistory == null || !restockHistory.Any())
+                {
+                    <div class="text-center py-5 text-muted">Історія поповнень порожня</div>
+                }
+                else
+                {
+                    <table class="apple-table">
+                        <thead>
+                            <tr>
+                                <th>Дата</th>
+                                <th>Товар</th>
+                                <th>Кількість</th>
+                                <th>Менеджер</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var h in restockHistory)
+                            {
+                                <tr>
+                                    <td style="color:var(--apple-sub);">@h.Date.ToString("dd.MM.yyyy HH:mm")</td>
+                                    <td style="font-weight:600;">@h.ProductName</td>
+                                    <td><span class="tag green">+@h.AddedQuantity шт.</span></td>
+                                    <td>@h.ManagerName</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                }
+            </div>
+        }
+    }
+</div>
 
             <div class="text-center py-5"><div class="spinner-border text-success"></div></div>
-        }
+                }
         else if (!myAccs.Any())
-        {
+                {
+                    <div style="background: rgba(255,59,48,.1); border-radius: 12px; padding: 16px; color: var(--apple-red); font-weight: 600;">
+                        <i class="bi bi-exclamation-triangle-fill me-2"></i> @syncError
+                    </div>
+                }
+                else if (syncResult != null)
+                {
+                    @if (syncResult.IsPerfectMatch)
+                    {
+                        <div class="text-center py-4">
+                            <i class="bi bi-check-circle-fill" style="font-size: 4rem; color: var(--apple-green);"></i>
+                            <h4 class="mt-3" style="font-weight: 700;">Ідеально!</h4>
+                            <p class="text-muted">База CRM повністю співпадає з Google Таблицею.</p>
+                        </div>
+                    }
+                    else
+                    {
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                            <div style="background: rgba(255,59,48,.05); border: 1px solid rgba(255,59,48,.2); border-radius: 12px; padding: 16px;">
+                                <h6 style="color: var(--apple-red); font-weight: 700; margin-bottom: 12px;"><i class="bi bi-x-circle-fill me-1"></i> Є в CRM, але немає в Таблиці (@syncResult.MissingInSheet.Count)</h6>
+                                <div style="max-height: 400px; overflow-y: auto; padding-right: 5px;">
+                                    @foreach (var item in syncResult.MissingInSheet)
+                                    {
+                                        <div style="background: #fff; padding: 10px; border-radius: 8px; margin-bottom: 8px; border: 1px solid var(--apple-border);">
+                                            <div style="font-weight: 600; font-size: 13px;">@item.ModelName</div>
+                                            <div style="font-family: monospace; color: var(--apple-sub); font-size: 12px; margin-top: 4px;">@item.Imei</div>
+                                            @if (item.IsInRepair)
+                                            {
+                                                <span class="tag" style="background: rgba(255,149,0,.1); color: #ff9500; font-size: 10px; padding: 2px 6px; margin-top: 4px;">На ремонті</span>
+                                            }
+                                        </div>
+                                    }
+                                </div>
+                            </div>
+                            <div style="background: rgba(255,149,0,.05); border: 1px solid rgba(255,149,0,.2); border-radius: 12px; padding: 16px;">
+                                <h6 style="color: #d97706; font-weight: 700; margin-bottom: 12px;"><i class="bi bi-exclamation-circle-fill me-1"></i> Є в Таблиці, але немає в CRM (@syncResult.ExtraInSheet.Count)</h6>
+                                <div style="max-height: 400px; overflow-y: auto; padding-right: 5px;">
+                                    @foreach (var item in syncResult.ExtraInSheet)
+                                    {
+                                        <div style="background: #fff; padding: 10px; border-radius: 8px; margin-bottom: 8px; border: 1px solid var(--apple-border);">
+                                            <div style="font-weight: 600; font-size: 13px;">@item.ModelName</div>
+                                            <div style="font-family: monospace; color: var(--apple-sub); font-size: 12px; margin-top: 4px;">@item.Imei</div>
+                                        </div>
+                                    }
+                                </div>
+                            </div>
+                        </div>
+                    }
+                }
+            </div>
+            <div class="ms-footer">
+                <button class="btn-apple outline" @onclick="() => showSyncModal = false">Закрити</button>
+            </div>
+        </div>
+    </div>
+}
 
             <div class="alert alert-info text-center">Аксесуарів немає в цьому магазині.</div>
-        }
-        else
-        {
+                }
+                else if (!googleSheetRows.Any())
+                {
+                    <div class="alert alert-warning">
+                        Не вдалося завантажити дані з таблиці. Перевірте налаштування посилання (CSV).
+                    </div>
+                }
+                else
+                {
             <div class="card shadow-sm border-0">
                 <table class="table table-hover mb-0 align-middle">
                     <thead class="table-light">
-                        <tr>
+                                    <tr>
                             <th class="ps-4">Назва товару</th>
                             <th>Ціна</th>
                             <th>Наявність</th>
-                            @if (isAdmin)
-                            {
+                                        @if (isAdmin)
+                                        {
                                 <th>Закупка (шт)</th>
-                            }
+                                        }
                             <th class="text-end pe-4">Дії</th>
-                        </tr>
-                    </thead>
-                    <tbody>
+                                    </tr>
+                                </thead>
+                                <tbody>
                         @foreach (var item in myAccs)
-                        {
-                            <tr>
+                                    {
+                                        <tr>
                                 <td class="ps-4 fw-bold">@item.ModelName</td>
                                 <td class="text-success fw-bold">@item.SellingPrice.ToString("N0") грн</td>
-                                <td>
+                                            <td>
                                     @if (item.Quantity > 0)
-                                    {
+                                                    {
                                         <span class="badge bg-dark rounded-pill">@item.Quantity шт.</span>
-                                    }
+                                                    }
                                     else
-                                    {
+                                            {
+                                                <td><input type="number" class="apple-input" style="padding: 4px 8px; font-weight: 700;" @bind="item.PurchasePrice" /></td>
+                                            }
+                                            <td><input type="number" class="apple-input" style="padding: 4px 8px; font-weight: 700; border-color: var(--apple-green);" @bind="item.SellingPrice" /></td>
+                                            <td><button class="btn-remove-img" style="position: static;" @onclick="() => parsedItems.Remove(item)">✕</button></td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
 
                                         <span class="badge bg-danger">Немає</span>
-                                    }
-                                </td>
+                                            }
+                                        </td>
                                 @if (isAdmin)
-                                {
+                                            {
                                     <td class="text-muted">@item.PurchasePrice.ToString("N0") грн</td>
-                                }
+                                            }
                                 <td class="text-end pe-4">
                                     <button class="btn btn-sm btn-outline-warning"
                                             disabled="@(item.Quantity <= 0)"
                                             @onclick="() => OpenTransferAccModal(item)">
                                         <i class="bi bi-arrow-right-circle-fill me-1"></i>Move
                                     </button>
-                                </td>
-                            </tr>
-                        }
-                    </tbody>
-                </table>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
             </div>
-        }
-    }
+            <div class="ms-footer">
+                @if (parsedItems.Any())
+                {
+                    <button class="btn-apple success" @onclick="SaveParsedItems" disabled="@isSavingSmart">
+                        @if (isSavingSmart)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1"></span>
+                        }
+                        <i class="bi bi-cloud-arrow-up-fill me-1"></i> Зберегти @parsedItems.Count пристроїв в базу
+                    </button>
+                }
+                <button class="btn-apple outline" @onclick='() => { showSmartPasteModal = false; targetRowNumber = null; parsedItems.Clear(); }'>Закрити</button>
+            </div>
+        </div>
+    </div>
+}
 
     @* ============================================== *@
     @* ВМІСТ: ПЕРЕМІЩЕННЯ (Transfers)                 *@
     @* ============================================== *@
     @if (activeTab == "transfers")
-    {
+{
         <div class="row g-4">
             @* БЛОК 1: ВХІДНІ (Те, що їде ДО МЕНЕ) - Тут ми ПІДТВЕРДЖУЄМО *@
             <div class="col-md-6">
@@ -275,28 +469,28 @@
                     <div class="card-header bg-warning text-dark fw-bold d-flex justify-content-between align-items-center">
                         <span>⬇️ Вхідні (Потрібно підтвердити)</span>
                         <span class="badge bg-dark">@IncomingCount</span>
-                    </div>
+            </div>
                     <div class="card-body bg-light">
                         @if (!incomingTransfers.Any())
-                        {
+                {
                             <div class="text-muted text-center py-4">Немає нових надходжень.</div>
-                        }
-                        else
-                        {
+                }
+                else
+                {
                             <div class="list-group">
                                 @foreach (var t in incomingTransfers)
-                                {
+                        {
                                     <div class="list-group-item border-0 shadow-sm mb-2 rounded">
                                         <div class="d-flex justify-content-between align-items-center mb-2">
                                             <h6 class="fw-bold m-0">@t.ModelName</h6>
                                             <small class="text-muted">Від: @t.FromStoreName</small>
-                                        </div>
+                    </div>
                                         <div class="d-flex justify-content-between align-items-center">
-                                            <div>
+                    <div>
                                                 @if (!string.IsNullOrEmpty(t.Identifier))
-                                                {
+                            {
                                                     <span class="badge bg-light text-dark border me-1">@t.Identifier</span>
-                                                }
+                        }
                                                 <span class="badge bg-info text-dark">Кількість: @t.Quantity</span>
                                             </div>
                                             <button class="btn btn-success btn-sm fw-bold" @onclick="() => ConfirmTransfer(t.Id)">
@@ -304,12 +498,15 @@
                                             </button>
                                         </div>
                                     </div>
-                                }
-                            </div>
                         }
                     </div>
+                        }
+                    </div>
+                    <div>
+                        <label class="apple-label">АКБ %</label>
+                        <input type="number" class="apple-input" @bind="newDevice.BatteryHealth" min="0" max="100" />
+                    </div>
                 </div>
-            </div>
 
             @* БЛОК 2: ВИХІДНІ (Те, що Я відправив) *@
             <div class="col-md-6">
@@ -317,37 +514,59 @@
                     <div class="card-header bg-white fw-bold">⬆️ Мої відправлення (В дорозі)</div>
                     <div class="card-body">
                         @if (!outgoingTransfers.Any())
-                        {
+                    {
                             <div class="text-muted text-center py-4">Немає активних відправлень.</div>
-                        }
+                    }
                         else
-                        {
+                                {
                             <div class="list-group list-group-flush">
                                 @foreach (var t in outgoingTransfers)
-                                {
+                            {
                                     <div class="list-group-item">
                                         <div class="d-flex justify-content-between align-items-center">
                                             <div>
                                                 <strong>@t.ModelName</strong> <i class="bi bi-arrow-right mx-1 text-muted"></i> @t.ToStoreName
-                                            </div>
-                                            <span class="badge bg-warning text-dark">Очікує</span>
-                                        </div>
-                                    </div>
-                                }
-                            </div>
-                        }
-                    </div>
-                </div>
             </div>
+                                            <span class="badge bg-warning text-dark">Очікує</span>
         </div>
+    </div>
+}
+
+@* 1.1. РЕДАГУВАННЯ ПРИСТРОЮ *@
+@if (showEditDeviceModal)
+{
+    <div class="modal-backdrop-apple" @onclick="() => showEditDeviceModal = false">
+        <div class="modal-sheet" @onclick:stopPropagation>
+            <div class="ms-header">
+                <h3 class="ms-title"><i class="bi bi-pencil-square me-2" style="color:var(--apple-blue);"></i>Редагування</h3>
+                <button class="ms-close" @onclick="() => showEditDeviceModal = false"><i class="bi bi-x"></i></button>
+            </div>
+            <div class="ms-body">
+                <div style="padding: 12px; background: var(--apple-gray); border-radius: 8px; margin-bottom: 16px; font-weight: 600;">
+                    @editDevice.ModelName @editDevice.Capacity @editDevice.Color
+                </div>
+                        }
+                        </div>
+                        <div>
+                            <label class="apple-label">Пам'ять</label>
+                            <input class="apple-input" @bind="editDevice.Capacity" />
+                        </div>
+                        <div>
+                            <label class="apple-label">Стан корпусу</label>
+                            <input class="apple-input" @bind="editDevice.ConditionStatus" />
+                        </div>
+                        <div>
+                            <label class="apple-label">АКБ %</label>
+                            <input type="number" class="apple-input" @bind="editDevice.BatteryHealth" />
+                        </div>
     }
-</div>
+                    </div>
 
 @* --- МОДАЛКИ (Приховані, з'являються при натисканні) --- *@
 
 @* 1. ДОДАВАННЯ ПРИСТРОЮ *@
 @if (showDeviceModal)
-{
+                    {
     <div class="modal fade show d-block" style="background: rgba(0,0,0,0.5);">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">
@@ -361,10 +580,10 @@
                         <option value="0">-- Оберіть модель --</option>
                         @* ТУТ ЗМІНА: Фільтруємо, щоб показати тільки iPhone (Category ID = 1) *@
                         @foreach (var p in products.Where(x => x.CategoryId == 1))
-                        {
+                            {
                             <option value="@p.Id">@p.Name</option>
-                        }
-                    </select>
+                            }
+                        </select>
 
                     <label>IMEI</label>
                     <input @bind="newDevice.Identifier" class="form-control mb-2" />
@@ -373,35 +592,40 @@
                         <div class="col">
                             <label>Колір</label>
                             <input @bind="newDevice.Color" class="form-control mb-2" />
-                        </div>
+                    </div>
                         <div class="col">
                             <label>Пам'ять</label>
                             <input @bind="newDevice.Capacity" class="form-control mb-2" />
-                        </div>
-                    </div>
+                </div>
+            </div>
                     <div class="row">
                         <div class="col">
                             <label>Стан</label>
                             <input @bind="newDevice.ConditionStatus" class="form-control mb-2" />
-                        </div>
+            </div>
                         <div class="col">
                             <label>Акумулятор</label>
                             <input @bind="newDevice.BatteryHealth" class="form-control mb-2" />
-                        </div>
-                    </div>
+        </div>
+    </div>
 
                     <label>Продаж ($)</label>
                     <input type="number" @bind="newDevice.SellingPrice" class="form-control mb-2" />
 
                     @if (isAdmin)
-                    {
+{
                         <label>Закупка ($)</label>
                         <input type="number" @bind="newDevice.PurchasePrice" class="form-control" />
                     }
-                </div>
+            </div>
                 <div class="modal-footer">
                     <button class="btn btn-primary" @onclick="SaveDevice">Зберегти</button>
-                </div>
+            </div>
+            <div class="ms-footer">
+                <button class="btn-apple outline" @onclick="() => showMiniSupplierModal = false">Скасування</button>
+                <button class="btn-apple primary" @onclick="SaveMiniSupplier" disabled="@string.IsNullOrWhiteSpace(miniSupName)">
+                    <i class="bi bi-check-lg me-1"></i>Зберегти
+                </button>
             </div>
         </div>
     </div>
@@ -424,7 +648,7 @@
                             {
                                 <a class="list-group-item list-group-item-action" @onclick="() => SelectAccessoryProduct(p)">@p.Name</a>
                             }
-                        </div>
+            </div>
                     }
                     @if (selectedAccId > 0)
                     {
@@ -436,8 +660,8 @@
                         {
                             <div class="row"><div class="col"><label>Закупка</label><input type="number" @bind="restockRequest.NewPurchasePrice" class="form-control" /></div><div class="col"><label>Продаж</label><input type="number" @bind="restockRequest.NewSellingPrice" class="form-control" /></div></div>
                         }
-                    }
-                </div>
+                        }
+                    </div>
                 <div class="modal-footer"><button class="btn btn-success" @onclick="SubmitRestock" disabled="@(selectedAccId == 0)">Додати</button></div>
             </div>
         </div>
@@ -453,12 +677,12 @@
                 <div class="modal-header bg-warning">
                     <h5 class="modal-title text-dark"><i class="bi bi-truck me-2"></i>Створення переміщення</h5>
                     <button class="btn-close" @onclick="() => showTransferModal = false"></button>
-                </div>
+            </div>
                 <div class="modal-body">
                     <div class="mb-3">
                         <label class="form-label text-muted small">Товар</label>
                         <input type="text" class="form-control fw-bold" value="@transferModelName" disabled />
-                    </div>
+                </div>
 
                     <div class="mb-3">
                         <label class="form-label text-muted small">Звідки -> Куди</label>
@@ -466,32 +690,32 @@
                             <span class="input-group-text bg-white">@stores.FirstOrDefault(s => s.Id == currentStoreId)?.Name</span>
                             <span class="input-group-text bg-light"><i class="bi bi-arrow-right"></i></span>
                             <select class="form-select fw-bold bg-light" @bind="targetStoreId">
-                                @foreach (var s in stores.Where(x => x.Id != currentStoreId))
-                                {
-                                    <option value="@s.Id">@s.Name</option>
-                                }
-                            </select>
-                        </div>
+                        @foreach (var s in stores.Where(x => x.Id != currentStoreId))
+                        {
+                            <option value="@s.Id">@s.Name</option>
+                        }
+                    </select>
+                </div>
                     </div>
 
-                    @if (isAccTransfer)
-                    {
+                @if (isAccTransfer)
+                {
                         <div class="mb-3">
                             <label class="form-label">Кількість для відправки</label>
                             <input type="number" class="form-control form-control-lg text-center border-warning"
-                                   @bind="transferQty" min="1" max="@maxQty" />
+                               @bind="transferQty" min="1" max="@maxQty" />
                             <div class="form-text text-end">Доступно: @maxQty шт.</div>
-                        </div>
-                    }
-                </div>
+                    </div>
+                }
+            </div>
                 <div class="modal-footer">
                     <button class="btn btn-light" @onclick="() => showTransferModal = false">Відміна</button>
                     <button class="btn btn-warning fw-bold px-4" @onclick="SendTransfer">
                         <i class="bi bi-send me-2"></i>Відправити заявку
-                    </button>
-                </div>
+                </button>
             </div>
         </div>
+    </div>
     </div>
 }
 @* 4. СТВОРЕННЯ НОВОГО ТОВАРУ (ДОВІДНИК) *@
@@ -503,23 +727,83 @@
                 <div class="modal-header bg-light">
                     <h5 class="modal-title">✨ Нова позиція в базі</h5>
                     <button class="btn-close" @onclick="() => showNewProductModal = false"></button>
-                </div>
+            </div>
                 <div class="modal-body">
                     <div class="mb-3">
                         <label class="form-label">Назва товару</label>
                         <input type="text" class="form-control" @bind="newProductName" placeholder="Наприклад: Silicone Case iPhone 15 Black" />
                         <div class="form-text">Цей товар з'явиться у пошуку для всіх магазинів.</div>
                     </div>
-                </div>
+                }
+
+                <label class="apple-label">Назва товару</label>
+                <input type="text" class="apple-input" @bind="editProductModel.Name" disabled="@(!isAdmin)" style="@(!isAdmin ? "background:var(--apple-gray);" : "")" />
+
+                <label class="apple-label">Сумісні моделі (через кому)</label>
+                <input type="text" class="apple-input" @bind="editProductModel.CompatibleModels" placeholder="Напр: 15 Pro, 15 Pro Max" />
+
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin-top: 16px;">
+                    @if (isAdmin)
+                    {
+                        <div>
+                            <label class="apple-label">Закупка (грн)</label>
+                            <input type="number" class="apple-input" @bind="editProductPurchasePrice" min="0" />
+                        </div>
                 <div class="modal-footer">
                     <button class="btn btn-secondary" @onclick="() => showNewProductModal = false">Відміна</button>
                     <button class="btn btn-success" @onclick="CreateNewProduct" disabled="@string.IsNullOrWhiteSpace(newProductName)">Створити</button>
+                        </div>
+                    }
+                    else
+                    {
+                        <div>
+                            <label class="apple-label" style="color:var(--apple-green);">Продаж (грн)</label>
+                            <input type="number" class="apple-input" style="font-weight:700; background:var(--apple-gray);" value="@editProductSellingPrice" disabled />
+                        </div>
+                    }
                 </div>
+
+                <label class="apple-label" style="margin-top: 20px;">Фото товару</label>
+                <div style="display:flex; gap:20px; align-items:flex-start;">
+                    <div style="flex:1;">
+                        <InputFile OnChange="HandleEditPhotoSelected" accept="image/png, image/jpeg, image/webp" class="apple-input" />
+                        @if (isUploadingPhoto)
+                        {
+                            <div style="font-size:12px; color:var(--apple-blue); margin-top:8px;">
+                                <span class="spinner-border spinner-border-sm me-1"></span> Завантаження фото...
+                            </div>
+                        }
+                    </div>
+
+                    @if (!string.IsNullOrEmpty(editProductModel.ImageUrl))
+                    {
+                        <div class="img-preview-box">
+                            <img src="@editProductModel.ImageUrl" />
+                            <button type="button" class="btn-remove-img" @onclick="() => editProductModel.ImageUrl = null">✕</button>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="img-preview-box" style="border-style: solid; background: #fafafa;">
+                            <i class="bi bi-image" style="font-size:2rem; color:#ccc;"></i>
+                        </div>
+                    }
+                </div>
+            </div>
+            <div class="ms-footer">
+                <button class="btn-apple outline" @onclick="() => showEditProductModal = false">Відміна</button>
+                <button class="btn-apple primary" @onclick="SaveChangesToProduct"
+                        disabled="@(string.IsNullOrWhiteSpace(editProductModel.Name) || isSavingProduct)">
+                    @if (isSavingProduct)
+                    {
+                        <span class="spinner-border spinner-border-sm me-1"></span>
+                    }
+                    <i class="bi bi-check-lg me-1"></i>Зберегти зміни
+                </button>
             </div>
         </div>
     </div>
 }
-
 
 @code {
     // --- ЗМІННІ ---
@@ -541,11 +825,33 @@
     private IEnumerable<TransferRequest> incomingTransfers => allTransfers?.Where(t => t.ToStoreId == currentStoreId && t.Status == "Pending") ?? new List<TransferRequest>();
     private IEnumerable<TransferRequest> outgoingTransfers => allTransfers?.Where(t => t.FromStoreId == currentStoreId && t.Status == "Pending") ?? new List<TransferRequest>();
     private int IncomingCount => incomingTransfers.Count();
+    private List<SupplierDto> suppliersList = new();
+
+    private List<DeviceView> filteredMyDevices = new();
+    private List<AccessoryDto> filteredMyAccs = new();
+    private List<DeviceView> searchOtherStoreDevices = new();
+
+    private HashSet<int> repairDeviceIdsSet = new();
+
+    private int totalMyDevices = 0;
+    private int myDevicesInRepair = 0;
+    private decimal totalInvestedUSD = 0;
+    private decimal totalDebtUSD = 0;
+    private decimal totalInvestedAccUAH = 0;
+    private decimal potentialProfitAccUAH = 0;
 
     // Модалки
     private bool showDeviceModal = false;
+    private bool showEditDeviceModal = false;
     private bool showRestockModal = false;
     private bool showTransferModal = false;
+    private bool showNewProductModal = false;
+
+    private bool showMiniSupplierModal = false;
+    private string miniSupName = "";
+    private string miniSupPhone = "";
+    private decimal miniSupDebt = 0;
+    private string miniSupNotes = "";
 
     // Змінні для форм
     private DeviceStock newDevice = new();
@@ -562,6 +868,17 @@
     private int transferItemId;
     private int transferProductId; // Потрібно для аксесуарів і девайсів
     private string transferModelName = "";
+    private bool showSyncModal = false;
+    private bool isSyncing = false;
+    private string syncError = "";
+    private InventoryCheckResponse? syncResult;
+
+    private List<string> availableColors = new();
+    private List<string> availableCapacities = new();
+
+    private List<SheetRowDto> googleSheetRows = new();
+    private bool isLoadingSheet = false;
+    private int? targetRowNumber;
 
     // Класи
     class DeviceView
@@ -605,19 +922,50 @@
         }
 
         // 2. Завантажуємо списки
-        stores = await Http.GetFromJsonAsync<List<Store>>("api/transfers/stores") ?? new();
-        products = await Http.GetFromJsonAsync<List<Product>>("api/inventory/products") ?? new();
+            stores = await Http.GetFromJsonAsync<List<Store>>("api/transfers/stores") ?? new();
+            products = await Http.GetFromJsonAsync<List<Product>>("api/inventory/products") ?? new();
 
         // Якщо Адмін ще не вибрав магазин (або у нього немає StoreId), ставимо перший зі списку
         if (currentStoreId == 0 && stores.Any())
         {
             currentStoreId = stores.First().Id;
-        }
+    }
 
         // Встановимо цільовий магазин для переміщень
-        targetStoreId = stores.FirstOrDefault(s => s.Id != currentStoreId)?.Id ?? 0;
+            targetStoreId = stores.FirstOrDefault(s => s.Id != currentStoreId)?.Id ?? 0;
 
-        await LoadTabData();
+            await LoadTabData();
+        }
+    }
+    private async Task RunSync()
+    {
+        isSyncing = true;
+        syncError = "";
+        syncResult = null;
+        showSyncModal = true;
+        StateHasChanged();
+
+        try
+        {
+            var res = await Http.GetAsync($"api/inventory/check-sync/{currentStoreId}");
+            if (res.IsSuccessStatusCode)
+            {
+                syncResult = await res.Content.ReadFromJsonAsync<InventoryCheckResponse>();
+            }
+            else
+            {
+                syncError = await res.Content.ReadAsStringAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            syncError = ex.Message;
+        }
+        finally
+        {
+            isSyncing = false;
+            StateHasChanged();
+        }
     }
 
     private async Task SetTab(string tab) { activeTab = tab; await LoadTabData(); }
@@ -669,28 +1017,28 @@
         await LoadTabData();
     }
     private async Task CreateNewProduct()
-    {
-        var newProd = new Product
         {
+        var newProd = new Product
+            {
             Name = newProductName,
             CategoryId = 2 // 2 = Аксесуари (перевір свій ID в базі!)
         };
 
         var response = await Http.PostAsJsonAsync("api/inventory/add-product", newProd);
 
-        if (response.IsSuccessStatusCode)
-        {
+            if (response.IsSuccessStatusCode)
+            {
             // Оновлюємо список продуктів, щоб новий товар відразу з'явився в пошуку
             products = await Http.GetFromJsonAsync<List<Product>>("api/inventory/products") ?? new();
 
             showNewProductModal = false;
             newProductName = ""; // Очистити поле
-        }
+    }
         else
-        {
+    {
             // Тут можна додати повідомлення про помилку, якщо треба
             Console.WriteLine("Помилка створення");
-        }
+    }
     }
 
     // --- ЛОГІКА ДОДАВАННЯ ---

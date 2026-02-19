@@ -1,6 +1,10 @@
 ﻿@page "/reports"
 @using AppleShopikCRM.Client.Models
+@using Microsoft.AspNetCore.Components.Web
+
+@inject IJSRuntime JS
 @inject HttpClient Http
+@rendermode InteractiveWebAssembly
 
 <PageTitle>Звіти</PageTitle>
 
@@ -9,17 +13,29 @@
         <div>
             <h2 class="fw-bold text-dark"><i class="bi bi-graph-up-arrow me-2"></i>Історія Продажів</h2>
             <p class="text-muted">Перегляд фінансових результатів та деталей чеків</p>
+            </div>
         </div>
 
         <div class="d-flex align-items-center gap-3">
             @* Вибір магазину *@
             <select class="form-select fw-bold border-primary" @bind="currentStoreId" @after="LoadHistory">
-                @foreach (var s in stores)
-                {
+                    @foreach (var s in stores)
+                    {
                     <option value="@s.Id">📍 @s.Name</option>
-                }
-            </select>
+                    }
+                </select>
             <button class="btn btn-primary" @onclick="LoadHistory"><i class="bi bi-arrow-clockwise"></i></button>
+            </div>
+
+            @if (showComparison)
+            {
+                <div class="filter-group" style="background: #e9e9eb; border:none;">
+                    <span style="font-size:11px; font-weight:700; color:var(--apple-sub); text-transform:uppercase;">Період 2:</span>
+                    <input type="date" class="apple-input" style="background:transparent; border:none;" @bind="compareStart" />
+                    <span class="text-muted">—</span>
+                    <input type="date" class="apple-input" style="background:transparent; border:none;" @bind="compareEnd" />
+                </div>
+            }
         </div>
     </div>
 
@@ -32,55 +48,138 @@
                     <div class="card-body">
                         <div class="opacity-75 small">Виручка (Каса)</div>
                         <div class="fs-3 fw-bold">@salesHistory.Sum(x => x.FinalAmount).ToString("N0") ₴</div>
-                    </div>
                 </div>
+                <div class="stat-sub">≈ @salesHistory.Sum(x => x.FinalAmount).ToString("N0") ₴</div>
             </div>
+            <div class="stat-card" style="border: 2px solid rgba(52,199,89,.3); background: rgba(52,199,89,.03);">
+                <div class="stat-title" style="color: #1a7a35;">Чистий Прибуток</div>
+                <div class="stat-val" style="color: var(--apple-green);">
+                    +$@GetTotalUSD(salesHistory, true).ToString("N0")
+                </div>
             <div class="col-md-3">
                 <div class="card border-0 shadow-sm bg-success text-white h-100">
                     <div class="card-body">
                         <div class="opacity-75 small">Чистий Прибуток</div>
                         <div class="fs-3 fw-bold">@salesHistory.Sum(x => x.TotalProfit).ToString("N0") ₴</div>
-                    </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-title">Гарантії (Дохід)</div>
+                <div class="stat-val" style="color: var(--apple-blue);">
+                    $@GetWarrantyUSD(salesHistory).ToString("N0")
                 </div>
+                <div class="stat-sub">@salesHistory.SelectMany(x => x.Items).Count(i => i.WarrantyPrice > 0) шт. продано</div>
             </div>
             <div class="col-md-3">
                 <div class="card border-0 shadow-sm bg-info text-white h-100">
                     <div class="card-body">
                         <div class="opacity-75 small">Гарантії</div>
                         <div class="fs-3 fw-bold">@salesHistory.SelectMany(x => x.Items).Sum(i => i.WarrantyPrice).ToString("N0") ₴</div>
-                    </div>
                 </div>
+                <div class="stat-sub">Видано знижок: $@((salesHistory.Sum(x => x.TradeInDiscount) / ExchangeRateSafe).ToString("N0"))</div>
             </div>
+        </div>
             <div class="col-md-3">
                 <div class="card border-0 shadow-sm bg-warning text-dark h-100">
                     <div class="card-body">
                         <div class="opacity-75 small">Trade-In (Отримано)</div>
                         <div class="fs-3 fw-bold">@salesHistory.Sum(x => x.TradeInDiscount).ToString("N0") ₴</div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    }
+    </div>
+@if (!isLoading)
+    {
+        @* 🔥 ВГЛЯД: АНАЛІТИКА КАТЕГОРІЙ 🔥 *@
+        @if (activeView == "analytics" && reportCards.Any())
+        {
+            <div class="analytics-grid-2x2">
+                @foreach (var card in reportCards)
+                {
+                    <div class="cat-card">
+                        <div class="cat-header" style="justify-content: space-between;">
+                            <div style="display:flex; align-items:center; gap:12px;">
+                                <div class="cat-icon @card.BgClass bg-opacity-10 @card.ColorClass">
+                                    <i class="bi @card.Icon"></i>
+                                </div>
+                                <div class="cat-title">@card.Title</div>
+                            </div>
+                            @* 🔥 НОВА КНОПКА РОЗГОРТАННЯ *@
+                            <button class="btn-apple outline" style="padding: 4px 8px; font-size: 12px; border-radius: 6px;" @onclick="() => card.IsExpanded = !card.IsExpanded">
+                                <i class="bi @(card.IsExpanded ? "bi-chevron-up" : "bi-chevron-down")"></i>
+                            </button>
+                        </div>
+
+                        <table class="cat-table">
+                            <thead>
+                                <tr>
+                                    <th>Період</th>
+                                    <th>Оборот ($)</th>
+                                    <th>Прибуток ($)</th>
+                                    <th style="text-align:right;">К-сть</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td class="ct-label">Поточний</td>
+                                    <td class="ct-money">$@card.Current.Revenue.ToString("N0")</td>
+                                    <td class="ct-money" style="color:var(--apple-green);">+$@card.Current.Profit.ToString("N0")</td>
+                                    <td class="ct-qty">@card.Current.Count</td>
+                                </tr>
+
+                                @if (showComparison)
+                                {
+                                    <tr>
+                                        <td class="ct-label">Минулий</td>
+                                        <td class="ct-money">$@card.Prev.Revenue.ToString("N0")</td>
+                                        <td class="ct-money" style="color:var(--apple-green);">+$@card.Prev.Profit.ToString("N0")</td>
+                                        <td class="ct-qty">@card.Prev.Count</td>
+                                    </tr>
+
+                                    var diffRev = card.Current.Revenue - card.Prev.Revenue;
+                                    var diffProf = card.Current.Profit - card.Prev.Profit;
+                                    var diffQty = card.Current.Count - card.Prev.Count;
+
+                                    <tr style="background: #fafafa;">
+                                        <td class="ct-label" style="padding-top:8px;">Різниця</td>
+                                        <td style="padding-top:8px;">
+                                            <span style="font-weight:700; font-size:13px;" class="@(diffRev >= 0 ? "diff-pos" : "diff-neg")">
+                                                @(diffRev > 0 ? "+" : "")@diffRev.ToString("N0") $
+                                            </span>
+                                            <span class="diff-badge @(diffRev >= 0 ? "diff-pos" : "diff-neg")">@GetDiffPercent(card.Current.Revenue, card.Prev.Revenue)</span>
+                                        </td>
+                                        <td style="padding-top:8px;">
+                                            <span style="font-weight:700; font-size:13px;" class="@(diffProf >= 0 ? "diff-pos" : "diff-neg")">
+                                                @(diffProf > 0 ? "+" : "")@diffProf.ToString("N0") $
+                                            </span>
+                                            <span class="diff-badge @(diffProf >= 0 ? "diff-pos" : "diff-neg")">@GetDiffPercent(card.Current.Profit, card.Prev.Profit)</span>
+                                        </td>
+                                        <td style="text-align:right; padding-top:8px;">
+                                            <span style="font-weight:700; font-size:13px;" class="@(diffQty >= 0 ? "diff-pos" : "diff-neg")">
+                                                @(diffQty > 0 ? "+" : "")@diffQty
+                                            </span>
+                                            <span class="diff-badge @(diffQty >= 0 ? "diff-pos" : "diff-neg")">@GetDiffPercent((decimal)card.Current.Count, (decimal)card.Prev.Count)</span>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
 
     @* ТАБЛИЦЯ *@
     <div class="card shadow-sm border-0">
         <div class="card-body p-0">
             @if (isLoading)
-            {
+                        {
                 <div class="p-5 text-center text-muted">
                     <div class="spinner-border mb-2"></div>
                     <p>Завантаження звітів...</p>
-                </div>
-            }
+                                        </div>
+                                    }
             else if (!salesHistory.Any())
-            {
+                        {
                 <div class="p-5 text-center text-muted">
                     <i class="bi bi-inbox display-1"></i>
                     <p class="mt-3">Історія продажів порожня</p>
-                </div>
-            }
+            </div>
+        }
             else
-            {
+        {
                 <table class="table table-hover align-middle mb-0">
                     <thead class="bg-light text-muted small text-uppercase">
                         <tr>
@@ -130,8 +229,15 @@
                     </tbody>
                 </table>
             }
+            </div>
+        }
+    }
+    else
+    {
+        <div style="text-align:center; padding:80px; color:var(--apple-sub);">
+            <div class="spinner-border mb-2"></div> <div>Оновлення даних...</div>
         </div>
-    </div>
+    }
 </div>
 
 @* МОДАЛКА ДЕТАЛЕЙ *@
@@ -153,38 +259,43 @@
                         <div class="col-6 text-end">
                             <small class="text-muted d-block">Касир / Коментар</small>
                             <strong>@selectedSale.Comment</strong>
-                        </div>
-                    </div>
+            </div>
+
+            <div class="ms-body">
+                <div style="display:flex; justify-content:space-between; margin-bottom:12px; font-size:11px; text-transform:uppercase; font-weight:700; color:var(--apple-sub); padding:0 8px;">
+                    <div>Товар / Послуга</div>
+                    <div style="text-align:right;">Фінанси</div>
+                </div>
 
                     <h6 class="text-muted small text-uppercase fw-bold mb-3 border-bottom pb-2">Товари</h6>
-                    @foreach (var item in selectedSale.Items)
-                    {
+                @foreach (var item in selectedSale.Items)
+                {
                         <div class="d-flex justify-content-between align-items-center mb-3">
                             <div>
                                 <div class="fw-bold">@item.ModelName</div>
                                 <div class="small text-muted">
-                                    @if (item.Type == "Device")
-                                    {
+                                @if (item.Type == "Device")
+                                {
                                         <i class="bi bi-phone me-1"></i>
-                                    }
+                                }
                                     else
                                     {
 
                                         <i class="bi bi-headphones me-1"></i>
                                     }
                                     @item.Type
-                                    @if (item.WarrantyPrice > 0)
-                                    {
+                            @if (item.WarrantyPrice > 0)
+                            {
                                         <span class="badge bg-info text-dark ms-2">+ Гарантія @item.WarrantyPrice ₴</span>
-                                    }
+                                        }
+                                    </div>
                                 </div>
-                            </div>
                             <div class="text-end">
                                 <div class="fw-bold">@item.SellingPrice.ToString("N0") ₴</div>
                                 <div class="small text-success">Прибуток: @item.Profit.ToString("N0")</div>
-                            </div>
                         </div>
-                    }
+                    </div>
+                }
 
                     @if (selectedSale.TradeIns.Any())
                     {
@@ -195,19 +306,49 @@
                                 <div>
                                     <div class="fw-bold">@tr.Model</div>
                                     <small class="text-muted">IMEI: @tr.Imei</small>
-                                </div>
+                </div>
                                 <div class="fw-bold text-danger">-@tr.Price.ToString("N0") ₴</div>
-                            </div>
+            </div>
                         }
                     }
-                </div>
+        </div>
                 <div class="modal-footer bg-light justify-content-between">
                     <div>
                         <small class="text-muted me-2">Чистий прибуток:</small>
                         <span class="fw-bold text-success fs-5">+@selectedSale.TotalProfit.ToString("N0") ₴</span>
-                    </div>
+    </div>
                     <button class="btn btn-secondary" @onclick="() => selectedSale = null">Закрити</button>
-                </div>
+            </div>
+            <div class="ms-body" style="padding: 0;">
+                <table class="apple-table">
+                    <thead style="position: sticky; top: 0; background: #fafafa; z-index: 10;">
+                        <tr>
+                            <th>Назва товару</th>
+                            <th>Категорія</th>
+                            <th style="text-align:center;">К-сть</th>
+                            <th style="text-align:right;">Оборот ($)</th>
+                            <th style="text-align:right;">Прибуток ($)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @{
+                            // Групуємо всі товари зі всіх чеків
+                            var allItemsGrouped = salesHistory.SelectMany(s => s.Items)
+                            .GroupBy(i => new { i.ModelName, i.Type })
+                            .OrderByDescending(g => g.Sum(i => GetItemActualUSD(i, "Prof")));
+                        }
+                        @foreach (var g in allItemsGrouped)
+                        {
+                            <tr>
+                                <td style="font-weight:600;">@g.Key.ModelName</td>
+                                <td style="color:var(--apple-sub); font-size:12px;">@g.Key.Type</td>
+                                <td style="text-align:center; font-weight:700;">@g.Sum(i => i.Quantity)</td>
+                                <td style="text-align:right; font-weight:700;">$@g.Sum(i => GetItemActualUSD(i, "Rev")).ToString("N0")</td>
+                                <td style="text-align:right; font-weight:700; color:var(--apple-green);">+$@g.Sum(i => GetItemActualUSD(i, "Prof")).ToString("N0")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
             </div>
         </div>
     </div>
@@ -216,9 +357,24 @@
 @code {
     private List<SaleReportDto> salesHistory = new();
     private List<Store> stores = new();
+    private List<SaleReportDto> salesHistory = new();
+    private List<SaleReportDto> compareHistory = new();
+    private List<ReportCardData> reportCards = new();
+
+    private string activeView = "analytics";
     private int currentStoreId = 1;
     private bool isLoading = false;
+    private bool showComparison = false;
+    private bool showItemsModal = false;
     private SaleReportDto? selectedSale;
+
+    private DateTime startDate = DateTime.Today.AddDays(-30);
+    private DateTime endDate = DateTime.Today;
+    private DateTime compareStart = DateTime.Today.AddDays(-60);
+    private DateTime compareEnd = DateTime.Today.AddDays(-31);
+
+    private decimal exchangeRate = 43.0m;
+    private decimal ExchangeRateSafe => exchangeRate > 0 ? exchangeRate : 1;
 
     protected override async Task OnInitializedAsync()
     {
@@ -236,11 +392,26 @@
         catch (Exception ex)
         {
             Console.WriteLine(ex.Message);
-        }
+    }
         finally
-        {
+    {
             isLoading = false;
-        }
+    }
+
+    public class SaleItemDto
+    {
+        public string ModelName { get; set; } = "";
+        public string Type { get; set; } = "";
+        public int Quantity { get; set; }
+
+        public decimal SellingPrice { get; set; }
+        public decimal WarrantyPrice { get; set; }
+        public decimal Profit { get; set; }
+        public decimal WarrantyProfit { get; set; }
+
+        // 🔥 НОВІ ДОЛАРОВІ ПОЛЯ
+        public decimal SellingPriceUSD { get; set; }
+        public decimal ProfitUSD { get; set; }
     }
 
     private void OpenDetails(SaleReportDto sale)

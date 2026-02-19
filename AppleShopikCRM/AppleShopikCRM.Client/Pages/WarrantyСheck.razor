@@ -1,0 +1,253 @@
+﻿@page "/warranty-check"
+@using AppleShopikCRM.Client.Models
+@using Microsoft.AspNetCore.Authorization  @* <--- ДОДАТИ ЦЕ *@
+
+@inject HttpClient Http
+@rendermode InteractiveWebAssembly
+
+<PageTitle>Перевірка гарантії — Apple Shopik</PageTitle>
+
+<style>
+    :root {
+        --apple-blue: #0071e3;
+        --apple-green: #34c759;
+        --apple-gray: #f5f5f7;
+        --apple-border: #d2d2d7;
+        --apple-text: #1d1d1f;
+        --apple-sub: #6e6e73;
+        --radius-lg: 14px;
+        --shadow-card: 0 2px 12px rgba(0,0,0,.07), 0 1px 3px rgba(0,0,0,.05);
+    }
+
+    .wc-root {
+        padding: 40px 20px;
+        font-family: -apple-system, 'SF Pro Display', Arial, sans-serif;
+        background: var(--apple-gray);
+        min-height: 100vh;
+        color: var(--apple-text);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
+
+    .apple-card {
+        background: #fff;
+        border-radius: var(--radius-lg);
+        box-shadow: var(--shadow-card);
+        padding: 30px;
+        width: 100%;
+        max-width: 600px;
+        margin-bottom: 20px;
+    }
+
+    .search-input {
+        width: 100%;
+        padding: 14px 20px;
+        border-radius: 12px;
+        border: 2px solid var(--apple-border);
+        outline: none;
+        font-size: 18px;
+        font-weight: 600;
+        text-align: center;
+        transition: all .2s;
+        margin-bottom: 16px;
+    }
+
+        .search-input:focus {
+            border-color: var(--apple-blue);
+            box-shadow: 0 0 0 4px rgba(0,113,227,.1);
+        }
+
+    .btn-apple {
+        width: 100%;
+        border: none;
+        border-radius: 12px;
+        padding: 14px;
+        font-size: 16px;
+        font-weight: 700;
+        cursor: pointer;
+        transition: all .15s;
+        background: var(--apple-blue);
+        color: #fff;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 8px;
+    }
+
+        .btn-apple:hover {
+            background: var(--apple-blue-h);
+            transform: translateY(-1px);
+        }
+
+        .btn-apple:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+    .result-card {
+        background: #fff;
+        border-radius: var(--radius-lg);
+        box-shadow: var(--shadow-card);
+        padding: 24px;
+        width: 100%;
+        max-width: 600px;
+    }
+
+    .warranty-item {
+        border: 1.5px solid var(--apple-border);
+        border-radius: 12px;
+        padding: 16px;
+        margin-bottom: 12px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        background: #fff;
+    }
+
+        .warranty-item.active {
+            border-color: var(--apple-green);
+            background: rgba(52,199,89,.03);
+            border-left: 5px solid var(--apple-green);
+        }
+
+        .warranty-item.expired {
+            background: var(--apple-gray);
+            opacity: 0.8;
+        }
+</style>
+
+<div class="wc-root">
+    <div style="text-align:center; margin-bottom:24px;">
+        <i class="bi bi-shield-check" style="font-size: 3rem; color: var(--apple-blue);"></i>
+        <h2 style="font-weight:700; margin-top:10px;">Перевірка гарантії</h2>
+        <p style="color:var(--apple-sub);">Введіть номер телефону клієнта для пошуку</p>
+    </div>
+
+    <div class="apple-card">
+        <input type="tel" class="search-input" placeholder="Наприклад: 099 123 45 67" @bind="phone" @bind:event="oninput" @onkeydown="OnKeyDown" />
+        <button class="btn-apple" @onclick="CheckWarranty" disabled="@(isLoading || string.IsNullOrWhiteSpace(phone))">
+            @if (isLoading)
+            {
+                <span class="spinner-border spinner-border-sm"></span>
+            }
+            <i class="bi bi-search"></i> Знайти інформацію
+        </button>
+    </div>
+
+    @if (result != null)
+    {
+        <div class="result-card">
+            @if (!result.Found)
+            {
+                <div style="text-align:center; color:var(--apple-red); padding: 20px 0;">
+                    <i class="bi bi-person-x-fill" style="font-size: 2rem; margin-bottom:10px; display:block;"></i>
+                    <h5 style="font-weight:700;">Клієнта не знайдено</h5>
+                    <p style="font-size:14px; margin:0;">Перевірте правильність введеного номеру.</p>
+                </div>
+            }
+            else
+            {
+                @* ПРОФІЛЬ КЛІЄНТА *@
+                <div style="display:flex; align-items:center; gap:16px; padding-bottom:20px; border-bottom:1px solid var(--apple-border); margin-bottom:20px;">
+                    <div style="width:56px; height:56px; border-radius:50%; background:var(--apple-blue); color:#fff; display:flex; align-items:center; justify-content:center; font-size:24px; font-weight:700;">
+                        @(result.Customer!.Name.Length > 0 ? result.Customer.Name[0].ToString().ToUpper() : "?")
+                    </div>
+                    <div>
+                        <div style="font-size:1.2rem; font-weight:700;">@result.Customer.Name</div>
+                        <div style="color:var(--apple-sub); font-size:14px; margin-top:2px;">
+                            <i class="bi bi-telephone me-1"></i> @result.Customer.Phone
+                        </div>
+                    </div>
+                </div>
+
+                @* АКТИВНІ ГАРАНТІЇ *@
+                <h5 style="font-size:14px; font-weight:700; color:var(--apple-sub); text-transform:uppercase; margin-bottom:12px;">
+                    Активні гарантії (@result.ActiveWarranties.Count)
+                </h5>
+
+                @if (!result.ActiveWarranties.Any())
+                {
+                    <div style="background:var(--apple-gray); padding:16px; border-radius:12px; text-align:center; color:var(--apple-sub); margin-bottom:24px;">
+                        Немає діючих гарантій
+                    </div>
+                }
+                else
+                {
+                    <div style="margin-bottom:24px;">
+                        @foreach (var w in result.ActiveWarranties)
+                        {
+                            <div class="warranty-item active">
+                                <div>
+                                    <div style="font-weight:700; font-size:16px;">@w.DeviceModel</div>
+                                    @if (!string.IsNullOrEmpty(w.Imei))
+                                    {
+                                        <div style="font-family:monospace; font-size:12px; color:var(--apple-sub);">SN/IMEI: @w.Imei</div>
+                                    }
+                                    <div style="font-size:13px; color:var(--apple-sub); margin-top:4px;">
+                                        <strong>@w.WarrantyType</strong> (@w.TermMonths міс.) <br />
+                                        @w.StartDate.ToString("dd.MM.yyyy") — @w.EndDate.ToString("dd.MM.yyyy")
+                                    </div>
+                                </div>
+                                <div style="text-align:right;">
+                                    <div style="color:var(--apple-green); font-weight:700; font-size:14px;"><i class="bi bi-check-circle-fill me-1"></i>Діє</div>
+                                    <div style="font-size:12px; font-weight:600; margin-top:4px;">Залишилось: @w.DaysLeft дн.</div>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
+
+                @* ПРОСТРОЧЕНІ ГАРАНТІЇ *@
+                @if (result.ExpiredWarranties.Any())
+                {
+                    <details>
+                        <summary style="font-size:14px; font-weight:700; color:var(--apple-sub); text-transform:uppercase; cursor:pointer; outline:none;">
+                            Прострочені гарантії (@result.ExpiredWarranties.Count)
+                        </summary>
+                        <div style="margin-top:12px;">
+                            @foreach (var w in result.ExpiredWarranties)
+                            {
+                                <div class="warranty-item expired">
+                                    <div>
+                                        <div style="font-weight:600; font-size:15px; color:var(--apple-text);">@w.DeviceModel</div>
+                                        <div style="font-size:12px; color:var(--apple-sub); margin-top:2px;">
+                                            @w.WarrantyType • До @w.EndDate.ToString("dd.MM.yyyy")
+                                        </div>
+                                    </div>
+                                    <div style="font-size:12px; font-weight:600; color:var(--apple-sub);">Завершена</div>
+                                </div>
+                            }
+                        </div>
+                    </details>
+                }
+            }
+        </div>
+    }
+</div>
+
+@code {
+    private string phone = "";
+    private bool isLoading = false;
+    private WarrantyCheckResult? result;
+
+    private async Task CheckWarranty()
+    {
+        if (string.IsNullOrWhiteSpace(phone)) return;
+        isLoading = true;
+        result = null;
+        try
+        {
+            result = await Http.GetFromJsonAsync<WarrantyCheckResult>(
+                $"api/customers/check-warranty/{Uri.EscapeDataString(phone.Trim())}");
+        }
+        catch { result = new WarrantyCheckResult { Found = false }; }
+        finally { isLoading = false; }
+    }
+
+    private async Task OnKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter") await CheckWarranty();
+    }
+}
